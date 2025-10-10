@@ -122,7 +122,7 @@ class Router:
                 "error": {"message": f"Request failed: {str(e)}"}
             }
     
-    async def _stream_ollama_request(self, request_data: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
+    async def _stream_ollama_request(self, request_data: Dict[str, Any]) -> AsyncGenerator[str, None]:
         """Stream a request to Ollama."""
         url = f"{self.ollama_endpoint}/api/chat"
         
@@ -130,16 +130,20 @@ class Router:
             async with httpx.AsyncClient(timeout=180.0) as client:
                 async with client.stream("POST", url, json=request_data) as response:
                     if response.status_code != 200:
-                        yield {
+                        error_msg = {
                             "error": {"message": f"Ollama returned status: {response.status_code}", "code": response.status_code}
                         }
+                        yield f"data: {json.dumps(error_msg)}\n\n"
+                        yield "data: [DONE]\n\n"
                         return
                     
                     async for line in response.aiter_lines():
                         if line.strip():
                             try:
                                 chunk = json.loads(line)
-                                yield chunk
+                                yield f"data: {json.dumps(chunk)}\n\n"
+                                if chunk.get("done", False):
+                                    yield "data: [DONE]\n\n"
                             except json.JSONDecodeError:
                                 continue
         except Exception as e:
