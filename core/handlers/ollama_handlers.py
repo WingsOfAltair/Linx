@@ -110,6 +110,10 @@ class OllamaResponseHandler(BaseResponseHandler):
     
     def parse_streaming_chunk(self, chunk_data: Dict[str, Any]) -> Dict[str, Any]:
         """Parse Ollama streaming chunk."""
+        # Handle keep-alive messages by returning empty content
+        if chunk_data.get("keep_alive", False):
+            return {"content": ""}
+        
         parsed = {"content": ""}
         
         if "message" in chunk_data and "content" in chunk_data["message"]:
@@ -119,4 +123,7 @@ class OllamaResponseHandler(BaseResponseHandler):
     
     def is_streaming_done(self, chunk_data: Dict[str, Any]) -> bool:
         """Check if Ollama streaming is complete."""
+        # Ignore keep-alive messages when checking completion
+        if chunk_data.get("keep_alive", False):
+            return False
         return chunk_data.get("done", False)

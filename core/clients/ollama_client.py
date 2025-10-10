@@ -205,26 +205,41 @@ class OllamaClient(BaseClient):
             request_data["max_tokens"] = max_tokens
         
         try:
-            async with httpx.AsyncClient(timeout=180.0) as client:
+            # Use shorter initial timeout but keep the connection alive
+            timeout = httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=None)
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 async with client.stream(
                     "POST",
                     f"{self.endpoint}/api/chat",
                     json=request_data
                 ) as response:
-                    
                     if response.status_code != 200:
                         yield {
                             "error": {"message": f"Ollama returned status: {response.status_code}", "code": response.status_code}
                         }
                         return
+
+                    last_chunk_time = time.time()
+                    empty_chunks = 0
                     
                     async for line in response.aiter_lines():
+                        current_time = time.time()
+                        if current_time - last_chunk_time > 10:
+                            # Send an empty message to keep the connection alive
+                            yield {"keep_alive": True}
+                            last_chunk_time = current_time
+                        
                         if line.strip():
                             try:
                                 chunk = json.loads(line)
+                                empty_chunks = 0
+                                last_chunk_time = current_time
                                 yield chunk
                             except json.JSONDecodeError:
-                                continue
+                                empty_chunks += 1
+                                if empty_chunks > 5:
+                                    continue
+                                logger.warning(f"Invalid JSON in stream: {line[:100]}...")
                                 
         except Exception as e:
             logger.error(f"Ollama streaming error: {str(e)}")
