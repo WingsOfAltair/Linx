@@ -2,7 +2,7 @@ import logging
 import asyncio
 import httpx
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 from ..util import estimate_message_tokens, count_tokens_in_messages
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,8 @@ class BaseRequestHandler(ABC):
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
                     loop.create_task(self.close_client())
-            except:
+            except Exception as e:
+                logger.debug(f"Error closing client: {str(e)}")
                 pass
     
     @abstractmethod

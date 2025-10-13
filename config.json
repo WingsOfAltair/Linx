@@ -25,14 +25,14 @@
         "enabled": true,
         "endpoint": "http://localhost:11434",
         "model_mappings": {
-            "default": "qwen3:latest",
+            "default": "qwen3-coder:latest",
             "qwen3": "qwen3:latest",
             "qwen3-coder": "qwen3-coder:latest",
             "qwen3-coder-480b": "qwen3-coder:480b-cloud"
         },
         "thinking_mode": true,
         "skip_integrity_check": true,
-        "max_streaming_tokens": 32000
+        "max_streaming_tokens": 96000
     },
     "routing": {
         "provider_priority": ["openrouter", "ollama", "llamacpp"],

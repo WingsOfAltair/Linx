@@ -43,7 +43,8 @@ class LlamaCppClient(BaseClient):
                             "message": "Llama.cpp connection successful",
                             "model": model_name
                         }
-                except:
+                except Exception as e:
+                    logger.debug(f"Error parsing model name: {str(e)}")
                     pass
                 
                 return {

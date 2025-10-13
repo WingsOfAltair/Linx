@@ -1,5 +1,7 @@
 import logging
 import json
+import uuid
+import time
 from typing import Dict, Any
 import httpx
 from .base_request_handler import BaseRequestHandler
@@ -62,7 +64,8 @@ class OllamaRequestHandler(BaseRequestHandler):
                     return {"error": {"message": f"Model '{model}' not available", "code": 404}}
                 else:
                     return {"error": {"message": error_data["error"], "code": response.status_code}}
-        except:
+        except Exception as e:
+            logger.debug(f"Error processing error data: {str(e)}")
             pass
         
         return {"error": {"message": error_msg, "code": response.status_code}}
