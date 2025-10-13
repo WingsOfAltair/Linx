@@ -391,9 +391,11 @@ def create_api(
         """Handle chat completions"""
         try:
             body = await request.json()
+            logger.info(f"Received chat completion request: {json.dumps(body, indent=2)}")
             
             user_agent = request.headers.get("User-Agent", "")
             is_cursor = "Cursor" in user_agent
+            logger.info(f"User-Agent: {user_agent}")
             
             # Detect Cursor verification requests
             model = body.get("model")

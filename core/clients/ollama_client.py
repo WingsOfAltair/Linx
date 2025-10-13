@@ -134,21 +134,39 @@ class OllamaClient(BaseClient):
     
     def process_messages(self, messages: List[Dict[str, Any]], thinking_mode: bool = True) -> List[Dict[str, Any]]:
         """Process messages based on thinking mode setting."""
-        if thinking_mode:
-            return messages
-            
         processed_messages = []
+        logger.debug(f"Processing messages with thinking_mode={thinking_mode}: {json.dumps(messages, indent=2)}")
+        
+        # Validate and process each message
         for message in messages:
-            if message.get("role") == "user" and "content" in message:
-                content = message["content"]
+            if not isinstance(message, dict):
+                logger.warning(f"Skipping invalid message format: {message}")
+                continue
                 
-                if isinstance(content, str) and not content.startswith("/no_think"):
-                    message = message.copy()
-                    message["content"] = f"/no_think {content}"
-                    logger.info(f"Added /no_think prefix to user message (thinking mode disabled)")
-                    
-            processed_messages.append(message)
+            role = message.get("role", "").lower()
+            content = message.get("content", "")
             
+            if role not in ["system", "user", "assistant"]:
+                logger.warning(f"Skipping message with invalid role: {role}")
+                continue
+                
+            if not isinstance(content, str):
+                logger.warning(f"Skipping message with non-string content: {content}")
+                continue
+            
+            # Handle thinking mode
+            if not thinking_mode and role == "user" and not content.startswith("/no_think"):
+                content = f"/no_think {content}"
+                logger.info(f"Added /no_think prefix to user message (thinking mode disabled)")
+            
+            processed_messages.append({"role": role, "content": content})
+        
+        if not processed_messages:
+            logger.warning("No valid messages after processing")
+            # Add a default user message to prevent errors
+            processed_messages.append({"role": "user", "content": "Hello"})
+        
+        logger.debug(f"Processed messages: {json.dumps(processed_messages, indent=2)}")
         return processed_messages
     
     async def chat_completion(self, model: str, messages: List[Dict[str, Any]], 
@@ -194,9 +212,19 @@ class OllamaClient(BaseClient):
     async def stream_chat_completion(self, model: str, messages: List[Dict[str, Any]],
                                    temperature: float = 0.7, max_tokens: Optional[int] = None) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream a chat completion from Ollama."""
+        # Ensure messages are in the correct format for Ollama
+        processed_messages = []
+        for msg in messages:
+            role = msg.get("role", "").lower()
+            content = msg.get("content", "")
+            if role in ["system", "user", "assistant"]:
+                processed_messages.append({"role": role, "content": content})
+            else:
+                logger.warning(f"Skipping message with invalid role: {role}")
+        
         request_data = {
             "model": model,
-            "messages": messages,
+            "messages": processed_messages,
             "temperature": temperature,
             "stream": True
         }
@@ -206,7 +234,7 @@ class OllamaClient(BaseClient):
         
         try:
             logger.info(f"Streaming request to Ollama for model {model}")
-            logger.debug(f"Request data: {json.dumps(request_data)}")
+            logger.info(f"Request data: {json.dumps(request_data, indent=2)}")
             
             async with httpx.AsyncClient(timeout=180.0) as client:
                 async with client.stream(
@@ -216,12 +244,14 @@ class OllamaClient(BaseClient):
                 ) as response:
                     if response.status_code != 200:
                         error_msg = f"Ollama returned status: {response.status_code}"
+                        response_text = await response.aread()
                         try:
-                            error_json = response.json()
+                            error_json = json.loads(response_text)
+                            logger.error(f"Full error response: {error_json}")
                             if isinstance(error_json, dict) and "error" in error_json:
                                 error_msg = error_json["error"]
-                        except:
-                            pass
+                        except Exception as e:
+                            logger.error(f"Failed to parse error response: {response_text} ({str(e)})")
                         
                         logger.error(f"Ollama error: {error_msg}")
                         yield {
