@@ -205,26 +205,46 @@ class OllamaClient(BaseClient):
             request_data["max_tokens"] = max_tokens
         
         try:
-            # Use shorter initial timeout but keep the connection alive
-            timeout = httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=None)
-            async with httpx.AsyncClient(timeout=timeout) as client:
+            logger.info(f"Streaming request to Ollama for model {model}")
+            logger.debug(f"Request data: {json.dumps(request_data)}")
+            
+            async with httpx.AsyncClient(timeout=180.0) as client:
                 async with client.stream(
                     "POST",
                     f"{self.endpoint}/api/chat",
                     json=request_data
                 ) as response:
                     if response.status_code != 200:
+                        error_msg = f"Ollama returned status: {response.status_code}"
+                        try:
+                            error_json = response.json()
+                            if isinstance(error_json, dict) and "error" in error_json:
+                                error_msg = error_json["error"]
+                        except:
+                            pass
+                        
+                        logger.error(f"Ollama error: {error_msg}")
                         yield {
-                            "error": {"message": f"Ollama returned status: {response.status_code}", "code": response.status_code}
+                            "error": {
+                                "message": error_msg,
+                                "code": response.status_code,
+                                "type": "ollama_error"
+                            }
                         }
                         return
-
-                    last_chunk_time = time.time()
-                    empty_chunks = 0
                     
+                    logger.info("Ollama stream started successfully")
                     async for line in response.aiter_lines():
-                        current_time = time.time()
-                        if current_time - last_chunk_time > 10:
+                        if line.strip():
+                            try:
+                                chunk = json.loads(line)
+                                logger.debug(f"Received chunk: {line[:200]}...")
+                                yield chunk
+                                if chunk.get("done", False):
+                                    logger.info("Ollama stream completed")
+                            except json.JSONDecodeError as e:
+                                logger.warning(f"Invalid JSON in stream: {line[:100]}... Error: {str(e)}")
+                                continue
                             # Send an empty message to keep the connection alive
                             yield {"keep_alive": True}
                             last_chunk_time = current_time

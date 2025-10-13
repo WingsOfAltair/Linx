@@ -516,16 +516,34 @@ def create_api(
                 async def wrapped_stream():
                     try:
                         async for chunk in route_result["stream_generator"]:
-                            logger.debug(f"Processing stream chunk: {chunk}")
+                            logger.debug(f"Processing stream chunk: {chunk!r}")
                             
-                            if "error" in chunk:
-                                error_json = json.dumps({"error": chunk["error"]})
-                                logger.error(f"Stream error: {error_json}")
+                            # Check if chunk is a string (error message)
+                            if isinstance(chunk, str):
+                                error_json = json.dumps({"error": {"message": chunk, "type": "ollama_error"}})
+                                logger.error(f"Ollama error response: {chunk}")
                                 yield f"data: {error_json}\n\n"
                                 yield "data: [DONE]\n\n"
                                 return
-                            
-                            if "message" in chunk and "content" in chunk["message"]:
+                                
+                            # Handle dict responses
+                            if isinstance(chunk, dict):
+                                if "error" in chunk:
+                                    error_json = json.dumps({"error": chunk["error"]})
+                                    logger.error(f"Stream error: {error_json}")
+                                    yield f"data: {error_json}\n\n"
+                                    yield "data: [DONE]\n\n"
+                                    return
+                                
+                                # Handle Ollama response format
+                                content = ""
+                                if "message" in chunk:
+                                    msg = chunk["message"]
+                                    if isinstance(msg, dict) and "content" in msg:
+                                        content = msg["content"]
+                                    elif isinstance(msg, str):
+                                        content = msg
+                                
                                 # Format as OpenAI-compatible chunk
                                 response = {
                                     "id": f"chatcmpl-{str(uuid.uuid4())[:8]}",
@@ -534,17 +552,20 @@ def create_api(
                                     "model": display_model,
                                     "choices": [{
                                         "index": 0,
-                                        "delta": {"content": chunk["message"]["content"]},
+                                        "delta": {"content": content},
                                         "finish_reason": None if not chunk.get("done") else "stop"
                                     }]
                                 }
+                                logger.debug(f"Sending chunk: {json.dumps(response)[:100]}...")
                                 yield f"data: {json.dumps(response)}\n\n"
                                 
                                 if chunk.get("done"):
                                     yield "data: [DONE]\n\n"
-                                    
+                            
                     except Exception as e:
                         logger.error(f"Error in stream wrapper: {str(e)}")
+                        import traceback
+                        logger.error(f"Traceback: {traceback.format_exc()}")
                         error_json = json.dumps({"error": {"message": str(e), "type": "server_error"}})
                         yield f"data: {error_json}\n\n"
                         yield "data: [DONE]\n\n"
