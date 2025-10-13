@@ -520,9 +520,17 @@ def create_api(
                     logger.info(f"Starting stream with ID: {response_id}")
                     
                     try:
+                async def wrapped_stream():
+                    try:
+                        chunk = None
+                        got_response = False
+                        start_time = time.time()
+                        
                         async for chunk in route_result["stream_generator"]:
+                            got_response = True
                             if isinstance(chunk, dict):
                                 if "error" in chunk:
+                                    logger.error(f"Error from provider: {chunk['error']}")
                                     yield f"data: {json.dumps(chunk)}\n\n"
                                     yield "data: [DONE]\n\n"
                                     return
@@ -533,6 +541,8 @@ def create_api(
                                     content = ""
                                     if isinstance(msg, dict):
                                         content = msg.get("content", "") or msg.get("thinking", "")
+                                    elif isinstance(msg, str):
+                                        content = msg
                                     
                                     # Format as OpenAI-compatible chunk
                                     response = {
@@ -547,18 +557,26 @@ def create_api(
                                         }]
                                     }
                                     
+                                    logger.debug(f"Sending chunk: {json.dumps(response)[:200]}...")
                                     yield f"data: {json.dumps(response)}\n\n"
                                     
                                     if chunk.get("done"):
                                         yield "data: [DONE]\n\n"
-                                        logger.info("Stream completed")
-                                    
+                                        logger.info("Stream completed with done signal")
+                                        return
+                        
+                        # If we get here with no response, there was a timeout or empty response
+                        if not got_response:
+                            logger.error("No response received from provider")
+                            error_json = json.dumps({"error": {"message": "Provider did not send back a response", "type": "empty_response"}})
+                            yield f"data: {error_json}\n\n"
+                            yield "data: [DONE]\n\n"
+                            
                     except Exception as e:
                         logger.error(f"Stream error: {str(e)}")
                         error_json = json.dumps({"error": {"message": str(e), "type": "stream_error"}})
                         yield f"data: {error_json}\n\n"
                         yield "data: [DONE]\n\n"
-                
                 return StreamingResponse(
                     content=wrapped_stream(),
                     media_type="text/event-stream",

@@ -177,26 +177,51 @@ class OllamaClient(BaseClient):
             request_data["max_tokens"] = max_tokens
         
         try:
+            logger.info(f"Sending request to Ollama: {json.dumps(request_data, indent=2)}")
             async with httpx.AsyncClient(timeout=180.0) as client:
                 async with client.stream(
                     "POST",
                     f"{self.endpoint}/api/chat",
-                    json=request_data
+                    json=request_data,
+                    headers={"Content-Type": "application/json"}
                 ) as response:
                     if response.status_code != 200:
+                        error_msg = f"Ollama returned status: {response.status_code}"
+                        try:
+                            error_text = await response.aread()
+                            if error_text:
+                                error_msg = f"{error_msg} - {error_text.decode('utf-8')}"
+                        except Exception as e:
+                            logger.error(f"Failed to read error response: {str(e)}")
+                        
+                        logger.error(error_msg)
                         yield {
-                            "error": {"message": f"Ollama returned status: {response.status_code}", "code": response.status_code}
+                            "error": {"message": error_msg, "code": response.status_code}
                         }
                         return
                     
+                    logger.info("Starting to stream response from Ollama")
+                    got_response = False
+                    
                     async for line in response.aiter_lines():
-                        if line.strip():
+                        line = line.strip()
+                        if line:
                             try:
                                 chunk = json.loads(line)
+                                if not got_response:
+                                    logger.info("Received first chunk from Ollama")
+                                    got_response = True
+                                logger.debug(f"Received chunk: {json.dumps(chunk)[:200]}...")
                                 yield chunk
                             except json.JSONDecodeError as e:
                                 logger.warning(f"Failed to parse JSON: {line[:100]}... Error: {str(e)}")
                                 continue
+                    
+                    if not got_response:
+                        logger.error("No response received from Ollama")
+                        yield {
+                            "error": {"message": "No response received from provider", "code": 500}
+                        }
                                 
         except Exception as e:
             logger.error(f"Ollama streaming error: {str(e)}")
