@@ -1,3 +1,24 @@
+[tool.mypy]
+python_version = "3.9"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+warn_unreachable = true
+strict_optional = true
+disallow_any_generics = true
+files = ["core/api.py"]
+exclude = ["setup.py", "run_cli.py"]
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+module = ["httpx.*", "uvicorn.*", "fastapi.*", "pyfiglet.*", "termcolor.*", "tiktoken.*"]
+ignore_missing_imports = true
+
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -74,11 +95,6 @@ line-length = 88
 target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
 include = '\.pyi?$'
 
-[tool.mypy]
-python_version = "3.8"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
