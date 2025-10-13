@@ -523,10 +523,24 @@ def create_api(
                         async for chunk in route_result["stream_generator"]:
                             logger.debug(f"Processing stream chunk: {chunk!r}")
                             
-                            # Check if chunk is a string (error message)
+                            # Pass through pre-formatted SSE strings from upstream
                             if isinstance(chunk, str):
-                                error_json = json.dumps({"error": {"message": chunk, "type": "ollama_error"}})
-                                logger.error(f"Ollama error response: {chunk}")
+                                s = chunk.strip()
+                                if s.startswith("data:"):
+                                    # Already an SSE line from upstream, forward as-is
+                                    logger.debug(f"Forwarding SSE line: {s[:100]}...")
+                                    # Ensure it ends with double newline per SSE
+                                    if not s.endswith("\n\n"):
+                                        s = s + "\n\n"
+                                    yield s
+                                    # If upstream sent [DONE], stop
+                                    if "data: [DONE]" in s:
+                                        logger.info("Upstream stream completed ([DONE] received)")
+                                        return
+                                    continue
+                                # Otherwise, wrap plain text as an error payload
+                                error_json = json.dumps({"error": {"message": s, "type": "ollama_error"}})
+                                logger.error(f"Upstream text (non-SSE) received, wrapping as error: {s}")
                                 yield f"data: {error_json}\n\n"
                                 yield "data: [DONE]\n\n"
                                 return
@@ -543,8 +557,20 @@ def create_api(
                                 # Handle Ollama response format
                                 if "message" in chunk:
                                     msg = chunk["message"]
-                                    if not isinstance(msg, dict) or "content" not in msg:
+                                    if not isinstance(msg, dict):
                                         logger.warning(f"Unexpected message format: {msg}")
+                                        continue
+                                    
+                                    content = ""
+                                    
+                                    # Handle thinking mode
+                                    if "thinking" in msg and msg["thinking"]:
+                                        content = f"[Thinking: {msg['thinking']}]"
+                                        logger.debug(f"Processing thinking mode content: {content}")
+                                    elif "content" in msg:
+                                        content = msg["content"]
+                                    else:
+                                        # Skip empty messages
                                         continue
                                     
                                     # Format as OpenAI-compatible chunk
@@ -555,7 +581,7 @@ def create_api(
                                         "model": display_model,
                                         "choices": [{
                                             "index": 0,
-                                            "delta": {"content": msg["content"]},
+                                            "delta": {"content": content},
                                             "finish_reason": "stop" if chunk.get("done") else None
                                         }]
                                     }
