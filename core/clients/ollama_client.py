@@ -15,12 +15,13 @@ class OllamaClient(BaseClient):
     Handles model discovery, chat completions, and streaming for Ollama.
     """
     
-    def __init__(self, endpoint: str = "http://localhost:11434"):
+    def __init__(self, endpoint: str = "http://localhost:11434", thinking_mode: bool = True):
         super().__init__(endpoint, "Ollama")
 
         # Initialize handlers
         self.request_handler = OllamaRequestHandler(endpoint)
         self.response_handler = OllamaResponseHandler()
+        self.thinking_mode = thinking_mode
     
     def test_connection(self) -> Dict[str, Any]:
         """Test the connection to Ollama API."""
@@ -131,10 +132,8 @@ class OllamaClient(BaseClient):
         logger.warning(f"No match found for {requested_model}, using default: {default_model}")
         return default_model
     
-    async def stream_chat_completion(self, model: str, messages: List[Dict[str, Any]],
-                                   temperature: float = 0.7, max_tokens: Optional[int] = None) -> AsyncGenerator[Dict[str, Any], None]:
-        """Stream a chat completion from Ollama."""
-        # Process messages to handle tool responses and other roles
+    def process_messages(self, messages: List[Dict[str, Any]], thinking_mode: bool = True) -> List[Dict[str, Any]]:
+        """Process messages and handle special roles."""
         processed_messages = []
         for msg in messages:
             role = msg.get("role", "").lower()
@@ -151,7 +150,21 @@ class OllamaClient(BaseClient):
             else:
                 # Map any other role to one of user/assistant/system
                 mapped_role = "user" if role not in ["system", "assistant"] else role
+                
+                # Handle thinking mode for user messages
+                if not thinking_mode and mapped_role == "user" and not content.startswith("/no_think"):
+                    content = f"/no_think {content}"
+                    logger.debug(f"Added /no_think prefix to user message (thinking mode disabled)")
+                    
                 processed_messages.append({"role": mapped_role, "content": content})
+        
+        return processed_messages
+    
+    async def stream_chat_completion(self, model: str, messages: List[Dict[str, Any]],
+                                   temperature: float = 0.7, max_tokens: Optional[int] = None) -> AsyncGenerator[Dict[str, Any], None]:
+        """Stream a chat completion from Ollama."""
+        # Process messages to handle tool responses and other roles
+        processed_messages = self.process_messages(messages, self.thinking_mode)
         
         request_data = {
             "model": model,
