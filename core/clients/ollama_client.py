@@ -146,7 +146,30 @@ class OllamaClient(BaseClient):
             role = message.get("role", "").lower()
             content = message.get("content", "")
             
-            if role not in ["system", "user", "assistant"]:
+            # Handle special message types by converting to standard roles
+            if role == "tool":
+                # Extract tool information
+                tool_name = message.get("name", "unknown_tool")
+                tool_content = message.get("content", "")
+                # Format as assistant message with tool context
+                role = "assistant"
+                content = f"Tool {tool_name} response: {tool_content}"
+                logger.info(f"Converted tool message to assistant message: {content}")
+            elif role == "function":
+                # Handle function response messages
+                func_name = message.get("name", "unknown_function")
+                func_content = message.get("content", "")
+                role = "assistant"
+                content = f"Function {func_name} returned: {func_content}"
+                logger.info(f"Converted function message to assistant message: {content}")
+            elif role == "assistant" and "function_call" in message:
+                # Handle function call messages
+                func_call = message["function_call"]
+                func_name = func_call.get("name", "unknown_function")
+                func_args = func_call.get("arguments", "{}")
+                content = f"Calling function {func_name} with arguments: {func_args}"
+                logger.info(f"Converted function call to content: {content}")
+            elif role not in ["system", "user", "assistant"]:
                 logger.warning(f"Skipping message with invalid role: {role}")
                 continue
                 
