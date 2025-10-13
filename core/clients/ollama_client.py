@@ -266,15 +266,24 @@ class OllamaClient(BaseClient):
                     json=request_data
                 ) as response:
                     if response.status_code != 200:
-                        error_msg = f"Ollama returned status: {response.status_code}"
-                        response_text = await response.aread()
                         try:
-                            error_json = json.loads(response_text)
-                            logger.error(f"Full error response: {error_json}")
-                            if isinstance(error_json, dict) and "error" in error_json:
-                                error_msg = error_json["error"]
+                            error_content = await response.aread()
+                            error_text = error_content.decode('utf-8') if isinstance(error_content, bytes) else str(error_content)
+                            
+                            logger.error(f"Ollama error response (status {response.status_code}): {error_text}")
+                            
+                            # Try to parse as JSON
+                            try:
+                                error_json = json.loads(error_text)
+                                if isinstance(error_json, dict) and "error" in error_json:
+                                    error_msg = error_json["error"]
+                                else:
+                                    error_msg = error_text
+                            except json.JSONDecodeError:
+                                error_msg = error_text
+                                
                         except Exception as e:
-                            logger.error(f"Failed to parse error response: {response_text} ({str(e)})")
+                            error_msg = f"Failed to read error response: {str(e)}"
                         
                         logger.error(f"Ollama error: {error_msg}")
                         yield {

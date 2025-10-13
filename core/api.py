@@ -517,6 +517,9 @@ def create_api(
                 # Router returned streaming result
                 async def wrapped_stream():
                     try:
+                        response_id = f"chatcmpl-{str(uuid.uuid4())[:8]}"
+                        logger.info(f"Starting stream with ID: {response_id}")
+                        
                         async for chunk in route_result["stream_generator"]:
                             logger.debug(f"Processing stream chunk: {chunk!r}")
                             
@@ -527,7 +530,7 @@ def create_api(
                                 yield f"data: {error_json}\n\n"
                                 yield "data: [DONE]\n\n"
                                 return
-                                
+                            
                             # Handle dict responses
                             if isinstance(chunk, dict):
                                 if "error" in chunk:
@@ -538,31 +541,32 @@ def create_api(
                                     return
                                 
                                 # Handle Ollama response format
-                                content = ""
                                 if "message" in chunk:
                                     msg = chunk["message"]
-                                    if isinstance(msg, dict) and "content" in msg:
-                                        content = msg["content"]
-                                    elif isinstance(msg, str):
-                                        content = msg
-                                
-                                # Format as OpenAI-compatible chunk
-                                response = {
-                                    "id": f"chatcmpl-{str(uuid.uuid4())[:8]}",
-                                    "object": "chat.completion.chunk",
-                                    "created": int(time.time()),
-                                    "model": display_model,
-                                    "choices": [{
-                                        "index": 0,
-                                        "delta": {"content": content},
-                                        "finish_reason": None if not chunk.get("done") else "stop"
-                                    }]
-                                }
-                                logger.debug(f"Sending chunk: {json.dumps(response)[:100]}...")
-                                yield f"data: {json.dumps(response)}\n\n"
-                                
-                                if chunk.get("done"):
-                                    yield "data: [DONE]\n\n"
+                                    if not isinstance(msg, dict) or "content" not in msg:
+                                        logger.warning(f"Unexpected message format: {msg}")
+                                        continue
+                                    
+                                    # Format as OpenAI-compatible chunk
+                                    response = {
+                                        "id": response_id,
+                                        "object": "chat.completion.chunk",
+                                        "created": int(time.time()),
+                                        "model": display_model,
+                                        "choices": [{
+                                            "index": 0,
+                                            "delta": {"content": msg["content"]},
+                                            "finish_reason": "stop" if chunk.get("done") else None
+                                        }]
+                                    }
+                                    
+                                    output = f"data: {json.dumps(response)}\n\n"
+                                    logger.debug(f"Sending stream chunk: {output[:100]}...")
+                                    yield output
+                                    
+                                    if chunk.get("done"):
+                                        logger.info("Stream completed, sending DONE")
+                                        yield "data: [DONE]\n\n"
                             
                     except Exception as e:
                         logger.error(f"Error in stream wrapper: {str(e)}")
