@@ -513,13 +513,50 @@ def create_api(
             # Use router's result directly instead of separate handlers
             if route_result.get("stream"):
                 # Router returned streaming result
+                async def wrapped_stream():
+                    try:
+                        async for chunk in route_result["stream_generator"]:
+                            logger.debug(f"Processing stream chunk: {chunk}")
+                            
+                            if "error" in chunk:
+                                error_json = json.dumps({"error": chunk["error"]})
+                                logger.error(f"Stream error: {error_json}")
+                                yield f"data: {error_json}\n\n"
+                                yield "data: [DONE]\n\n"
+                                return
+                            
+                            if "message" in chunk and "content" in chunk["message"]:
+                                # Format as OpenAI-compatible chunk
+                                response = {
+                                    "id": f"chatcmpl-{str(uuid.uuid4())[:8]}",
+                                    "object": "chat.completion.chunk",
+                                    "created": int(time.time()),
+                                    "model": display_model,
+                                    "choices": [{
+                                        "index": 0,
+                                        "delta": {"content": chunk["message"]["content"]},
+                                        "finish_reason": None if not chunk.get("done") else "stop"
+                                    }]
+                                }
+                                yield f"data: {json.dumps(response)}\n\n"
+                                
+                                if chunk.get("done"):
+                                    yield "data: [DONE]\n\n"
+                                    
+                    except Exception as e:
+                        logger.error(f"Error in stream wrapper: {str(e)}")
+                        error_json = json.dumps({"error": {"message": str(e), "type": "server_error"}})
+                        yield f"data: {error_json}\n\n"
+                        yield "data: [DONE]\n\n"
+
                 return StreamingResponse(
-                    route_result["stream_generator"],
+                    content=wrapped_stream(),
                     media_type="text/event-stream",
                     headers={
                         "Cache-Control": "no-cache",
                         "Connection": "keep-alive",
-                        "X-Accel-Buffering": "no"
+                        "X-Accel-Buffering": "no",
+                        "Content-Type": "text/event-stream"
                     }
                 )
             elif route_result.get("result"):
