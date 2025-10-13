@@ -64,7 +64,7 @@ class LlamaCppRequestHandler(BaseRequestHandler):
                 
                 # Handle common Llama.cpp errors
                 if response.status_code == 404:
-                    return {"error": {"message": f"Endpoint not found - check Llama.cpp server", "code": 404}}
+                    return {"error": {"message": "Endpoint not found - check Llama.cpp server", "code": 404}}
                 elif response.status_code == 400:
                     return {"error": {"message": f"Bad request: {error_message}", "code": 400}}
                 elif "context" in error_message.lower() or "length" in error_message.lower():

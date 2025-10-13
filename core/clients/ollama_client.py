@@ -154,7 +154,7 @@ class OllamaClient(BaseClient):
                 # Handle thinking mode for user messages
                 if not thinking_mode and mapped_role == "user" and not content.startswith("/no_think"):
                     content = f"/no_think {content}"
-                    logger.debug(f"Added /no_think prefix to user message (thinking mode disabled)")
+                    logger.debug("Added /no_think prefix to user message (thinking mode disabled)")
                     
                 processed_messages.append({"role": mapped_role, "content": content})
         

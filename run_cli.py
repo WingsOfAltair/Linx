@@ -1,4 +1,3 @@
-import asyncio
 import argparse
 import logging
 from pathlib import Path
@@ -16,7 +15,7 @@ from core.router import Router
 from core.util import load_config
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 )
 logger = logging.getLogger("ollamalink")
@@ -66,7 +65,7 @@ def auto_start_tunnel(port, host="127.0.0.1"):
             
             if tunnel_url:
                 print(f"\n{DIVIDER}")
-                print(termcolor.colored(f"✅ Tunnel started successfully!", SUCCESS_COLOR, attrs=['bold']))
+                print(termcolor.colored("✅ Tunnel started successfully!", SUCCESS_COLOR, attrs=['bold']))
                 print(f"{DIVIDER}\n")
                 print(termcolor.colored("Use this URL in Cursor AI:", INFO_COLOR, attrs=['bold']))
                 print(termcolor.colored(f"{cursor_url}", CODE_COLOR, attrs=['bold']))
@@ -109,12 +108,12 @@ def display_model_error(error_message, error_type):
         print(termcolor.colored("Troubleshooting Steps:", INFO_COLOR, attrs=['bold']))
         
         print("1. First, try pulling the model again to repair it:")
-        print(termcolor.colored(f"   ollama pull MODEL_NAME", CODE_COLOR))
+        print(termcolor.colored("   ollama pull MODEL_NAME", CODE_COLOR))
         print()
         
         print("2. If that doesn't work, remove the model completely and reinstall:")
-        print(termcolor.colored(f"   ollama rm MODEL_NAME", CODE_COLOR))
-        print(termcolor.colored(f"   ollama pull MODEL_NAME", CODE_COLOR))
+        print(termcolor.colored("   ollama rm MODEL_NAME", CODE_COLOR))
+        print(termcolor.colored("   ollama pull MODEL_NAME", CODE_COLOR))
         print()
         
         print("3. If problems persist, you may need to restart Ollama or check disk space")
@@ -204,6 +203,8 @@ def main():
     parser.add_argument("--max-tokens", type=int,
                         default=config["ollama"].get("max_streaming_tokens", 32000),
                         help="Maximum token limit for streaming requests (default: 32000)")
+
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging (overrides default warning level)")
     
     args = parser.parse_args()
     
@@ -293,7 +294,7 @@ def main():
     if args.tunnel:
         host = "127.0.0.1"
         print(f"\n{DIVIDER}")
-        print(termcolor.colored(f"Starting OllamaLink server with tunnel support...", INFO_COLOR, attrs=['bold']))
+        print(termcolor.colored("Starting OllamaLink server with tunnel support...", INFO_COLOR, attrs=['bold']))
         print(f"{DIVIDER}\n")
         
         # Start tunnel in background thread after server starts
@@ -314,7 +315,7 @@ def main():
         local_url = f"http://{host_display}:{args.port}/v1"
         
         print(f"\n{DIVIDER}")
-        print(termcolor.colored(f"Starting OllamaLink server in direct mode...", INFO_COLOR, attrs=['bold']))
+        print(termcolor.colored("Starting OllamaLink server in direct mode...", INFO_COLOR, attrs=['bold']))
         print(f"{DIVIDER}\n")
         print(termcolor.colored("Use this URL in Cursor AI:", INFO_COLOR, attrs=['bold']))
         print(termcolor.colored(f"{local_url}", CODE_COLOR, attrs=['bold']))
@@ -331,8 +332,17 @@ def main():
         print(termcolor.colored("Press CTRL+C to stop the server", INFO_COLOR))
         print()
 
+    # Adjust logging based on --debug
+    uvicorn_level = "debug" if args.debug else "warning"
+    if args.debug:
+        # Raise root log level for our modules
+        logging.getLogger().setLevel(logging.DEBUG)
+        for name in ["core", "ollamalink", "uvicorn", "httpx"]:
+            logging.getLogger(name).setLevel(logging.DEBUG)
+        print(termcolor.colored("Debug logging enabled", INFO_COLOR))
+
     # Start the API server (handles tunnels internally when requested)
-    uvicorn.run(app, host=host, port=args.port, log_level="warning")
+    uvicorn.run(app, host=host, port=args.port, log_level=uvicorn_level)
 
 if __name__ == "__main__":
     main()

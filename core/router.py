@@ -2,6 +2,7 @@ import logging
 import httpx
 import json
 import time
+import uuid
 from typing import Dict, List, Any, Optional, Tuple, AsyncGenerator
 from .clients import OllamaClient, OpenRouterClient, LlamaCppClient
 from .util import load_config
@@ -137,14 +138,52 @@ class Router:
                         yield "data: [DONE]\n\n"
                         return
                     
+                    response_id = f"chatcmpl-{str(uuid.uuid4())[:8]}"
+                    sent_role = False
+                    
                     async for line in response.aiter_lines():
                         if line.strip():
                             try:
                                 chunk = json.loads(line)
-                                yield f"data: {json.dumps(chunk)}\n\n"
+                                logger.debug(f"Got raw Ollama chunk: {json.dumps(chunk)[:200]}...")
+                                
+                                content = ""
+                                if "message" in chunk:
+                                    msg = chunk["message"]
+                                    if isinstance(msg, dict):
+                                        content = msg.get("content", "") or msg.get("thinking", "")
+                                    elif isinstance(msg, str):
+                                        content = msg
+                                    logger.debug(f"Extracted content from message: {content[:100]}...")
+                                
+                                # Format as OpenAI-compatible chunk
+                                delta = {"content": content}
+                                if not sent_role:
+                                    delta["role"] = "assistant"
+                                    sent_role = True
+                                    logger.debug("Added assistant role to first content chunk")
+                                
+                                response = {
+                                    "id": response_id,
+                                    "object": "chat.completion.chunk",
+                                    "created": int(time.time()),
+                                    "model": request_data.get("model", "unknown"),
+                                    "choices": [{
+                                        "index": 0,
+                                        "delta": delta,
+                                        "finish_reason": "stop" if chunk.get("done") else None
+                                    }]
+                                }
+                                
+                                logger.debug(f"Sending formatted chunk: {json.dumps(response)[:200]}...")
+                                yield f"data: {json.dumps(response)}\n\n"
+                                
                                 if chunk.get("done", False):
                                     yield "data: [DONE]\n\n"
+                                    logger.info("Stream completed with done signal")
+                                    
                             except json.JSONDecodeError:
+                                logger.warning(f"Failed to parse line as JSON: {line[:100]}...")
                                 continue
         except Exception as e:
             logger.error(f"Ollama streaming failed: {str(e)}")
@@ -241,7 +280,7 @@ class Router:
                 
         elif provider == "openrouter" and self.openrouter_client:
             # OpenRouter is healthy if client is initialized (has API key)
-            logger.info(f"OpenRouter client available: True")
+            logger.info("OpenRouter client available: True")
             self.provider_health["openrouter"].update({
                 "available": True,
                 "last_check": current_time,
