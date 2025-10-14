@@ -28,21 +28,38 @@ DEFAULT_VERIFICATION_COMPLETION_TOKENS = 8
 CURSOR_VERIFICATION_KEYWORDS = ["test", "hello", "hi", "ping", "verify", "check", "connection"]
 MAX_VERIFICATION_MESSAGE_LENGTH = 20
 
+# Timeout configurations
+DEFAULT_TIMEOUT = 180.0
+STREAMING_TIMEOUT = 300.0
+CONNECT_TIMEOUT = 30.0
+WRITE_TIMEOUT = 30.0
+
 logger = logging.getLogger(__name__)
- 
-tunnel_process: Optional[Any] = None
-tunnel_url: Optional[str] = None
-tunnel_port: Optional[int] = None
-        
+
+class TunnelState:
+    """Manages tunnel state to avoid global variables"""
+    def __init__(self):
+        self.process: Optional[Any] = None
+        self.url: Optional[str] = None
+        self.port: Optional[int] = None
+    
+    def is_running(self) -> bool:
+        return self.process is not None
+    
+    def reset(self) -> None:
+        self.process = None
+        self.url = None
+        self.port = None
+
 def create_api(
     ollama_endpoint: Optional[str] = None,
     api_key: Optional[str] = None,
     request_callback: Optional[Callable[[Dict[str, Any]], None]] = None
 ) -> FastAPI:
     """Create a new FastAPI instance with all routes configured"""
-    app = FastAPI(title="OllamaLink")
-
-    # Initialize components with proper error handling
+    app = FastAPI(title="Linx")
+    
+    tunnel_state = TunnelState()
     router = None
     config = None
     request_handlers: Dict[str, Optional[Union[OllamaRequestHandler, OpenRouterRequestHandler, LlamaCppRequestHandler]]] = {
@@ -307,7 +324,7 @@ def create_api(
     async def api_info() -> Response:
         """API root - provides basic info"""
         return JSONResponse(content={
-            "info": "OllamaLink API Bridge",
+            "info": "Linx API Bridge",
             "ollama_endpoint": router.ollama_endpoint if router is not None else None,
             "version": "0.1.0"
         })
@@ -371,15 +388,12 @@ def create_api(
             logger.info(f"Proxying to {url} (stream={stream})")
             logger.debug(f"Request body: {json.dumps(body)[:200]}...")
             
-            # Configure generous timeouts for streaming responses
             timeout = httpx.Timeout(
-                timeout=300.0,  # 5 minutes total timeout
-                read=None,    # No read timeout for streaming
-                write=30.0,   # 30 seconds for sending request
-                connect=30.0  # 30 seconds for connection
+                timeout=STREAMING_TIMEOUT,
+                read=None,
+                write=WRITE_TIMEOUT,
+                connect=CONNECT_TIMEOUT
             )
-            
-            # Configure connection limits
             limits = httpx.Limits(
                 max_keepalive_connections=5,
                 max_connections=10,
@@ -395,9 +409,7 @@ def create_api(
                     response = None
                     
                     try:
-                        # For raw passthrough (Ollama NDJSON), do not send an initial SSE chunk
                         if not raw_passthrough:
-                            # Send initial OpenAI-style SSE chunk
                             initial_chunk = {
                             "id": response_id,
                             "object": "chat.completion.chunk",
@@ -427,7 +439,6 @@ def create_api(
                                 return
 
                             async for line in response.aiter_lines():
-                                # Send periodic heartbeat for SSE only
                                 if not raw_passthrough and time.time() - last_heartbeat >= 5.0:
                                     try:
                                         yield ": ping\n\n"
@@ -437,13 +448,11 @@ def create_api(
                                         return
                                 
                                 if not line or not line.strip():
-                                    await asyncio.sleep(0.1)  # Small delay to prevent busy loop
+                                    await asyncio.sleep(0.1)
                                     continue
 
                                 if raw_passthrough:
-                                    # Forward Ollama NDJSON exactly as-is
                                     try:
-                                        # Validate it's JSON; if not, pass through anyway
                                         _ = json.loads(line)
                                     except json.JSONDecodeError:
                                         pass
@@ -490,7 +499,6 @@ def create_api(
                                     logger.warning(f"Failed to parse JSON: {e}")
                                     continue
 
-                            # Send final DONE if we exit the loop
                             if not raw_passthrough:
                                 yield "data: [DONE]\n\n"
 
@@ -521,7 +529,6 @@ def create_api(
                     }
                 )
 
-            # Handle regular non-streaming response
             async with httpx.AsyncClient(timeout=timeout) as client:
                 resp = await client.post(url, json=body)
                 if resp.status_code != 200:
@@ -569,11 +576,6 @@ def create_api(
         """Proxy Ollama's chat endpoint (Ollama native NDJSON)"""
         return await _proxy_ollama_request(request, "/api/chat", stream=True, raw_passthrough=True)
 
-    # OpenAI-compatible Chat Completions endpoint
-    @app.post("/v1/chat/completions", response_model=None)
-    async def openai_chat_completions(request: Request) -> Response:
-        """OpenAI-compatible chat completions that maps to Ollama chat with streaming (SSE)."""
-        return await _proxy_ollama_request(request, "/api/chat", stream=True, raw_passthrough=False)
 
     @app.post("/v1/api/generate", response_model=None)
     @app.post("/api/generate", response_model=None)
@@ -732,7 +734,7 @@ def create_api(
                         "index": 0,
                         "message": {
                             "role": "assistant",
-                            "content": "Connection verified. OllamaLink is ready!"
+                            "content": "Connection verified. Linx is ready!"
                         },
                         "finish_reason": "stop"
                     }],
@@ -741,7 +743,7 @@ def create_api(
                         "completion_tokens": DEFAULT_VERIFICATION_COMPLETION_TOKENS,
                         "total_tokens": DEFAULT_VERIFICATION_PROMPT_TOKENS + DEFAULT_VERIFICATION_COMPLETION_TOKENS
                     },
-                    "system_fingerprint": "ollamalink-server"
+                    "system_fingerprint": "linx-server"
                 }
                 
                 if stream:
@@ -754,7 +756,7 @@ def create_api(
                             "model": model,
                             "choices": [{
                                 "index": 0,
-                                "delta": {"content": "Connection verified. OllamaLink is ready!"},
+                                "delta": {"content": "Connection verified. Linx is ready!"},
                                 "finish_reason": "stop"
                             }]
                         }
@@ -879,16 +881,12 @@ def create_api(
                                 else:
                                     # Try direct content access if message structure is different
                                     content = chunk.get("content", "")
-                                
-                                # Some providers may send keep-alive chunks; tolerate empty content
-                                # Check if we need to include role in delta (first chunk should have role)
                                 delta = {"content": content}
                                 if not sent_initial_tick and msg:
                                     delta["role"] = "assistant"
                                 
                                 is_done = bool(chunk.get("done"))
                                 if is_done and (not content or content.strip() == ""):
-                                    # Finalizer with no content: just send [DONE]
                                     yield "data: [DONE]\n\n"
                                     return
                                 
@@ -910,7 +908,6 @@ def create_api(
                                     yield "data: [DONE]\n\n"
                                     return
                         
-                        # If we get here with no provider chunks at all, send an error
                         if not got_provider_chunk:
                             error_json = json.dumps({"error": {"message": "Provider did not send back a response", "type": "empty_response"}})
                             yield f"data: {error_json}\n\n"
@@ -962,13 +959,11 @@ def create_api(
     @app.post("/api/tunnel/start", response_model=None)
     async def start_tunnel(request: Request) -> Any:
         """Start a localhost.run tunnel"""
-        global tunnel_process, tunnel_url, tunnel_port
-        
         try:
             body = await request.json()
             port = body.get("port", 8000)
             
-            if tunnel_process is not None:
+            if tunnel_state.is_running():
                 return JSONResponse(
                     status_code=400,
                     content={"error": {"message": "Tunnel already running", "code": "tunnel_active"}}
@@ -984,16 +979,16 @@ def create_api(
                     content={"error": {"message": "Failed to start tunnel", "code": "tunnel_start_failed"}}
                 )
             
-            tunnel_url, tunnel_process = result
-            tunnel_port = port
+            tunnel_state.url, tunnel_state.process = result
+            tunnel_state.port = port
             
-            cursor_url = f"{tunnel_url}/v1"
+            cursor_url = f"{tunnel_state.url}/v1"
             
-            logger.info(f"Tunnel started successfully: {tunnel_url}")
+            logger.info(f"Tunnel started successfully: {tunnel_state.url}")
             
             return JSONResponse(content={
                 "success": True,
-                "tunnel_url": tunnel_url,
+                "tunnel_url": tunnel_state.url,
                 "cursor_url": cursor_url,
                 "port": port,
                 "status": "running"
@@ -1009,10 +1004,8 @@ def create_api(
     @app.post("/api/tunnel/stop", response_model=None)
     async def stop_tunnel() -> Any:
         """Stop the localhost.run tunnel"""
-        global tunnel_process, tunnel_url, tunnel_port
-        
         try:
-            if tunnel_process is None:
+            if not tunnel_state.is_running():
                 return JSONResponse(
                     status_code=400,
                     content={"error": {"message": "No tunnel running", "code": "no_tunnel"}}
@@ -1020,15 +1013,12 @@ def create_api(
             
             logger.info("Stopping tunnel...")
             
-            if hasattr(tunnel_process, 'terminate'):
-                tunnel_process.terminate()
-            elif hasattr(tunnel_process, 'kill'):
-                tunnel_process.kill()
+            if hasattr(tunnel_state.process, 'terminate'):
+                tunnel_state.process.terminate()
+            elif hasattr(tunnel_state.process, 'kill'):
+                tunnel_state.process.kill()
             
-            # Reset global state
-            tunnel_process = None
-            tunnel_url = None
-            tunnel_port = None
+            tunnel_state.reset()
             
             logger.info("Tunnel stopped successfully")
             
@@ -1047,16 +1037,14 @@ def create_api(
     @app.get("/api/tunnel/status")
     async def get_tunnel_status() -> Response:
         """Get current tunnel status"""
-        global tunnel_process, tunnel_url, tunnel_port
-        
-        is_running = tunnel_process is not None
-        cursor_url = f"{tunnel_url}/v1" if tunnel_url else None
+        is_running = tunnel_state.is_running()
+        cursor_url = f"{tunnel_state.url}/v1" if tunnel_state.url else None
         
         return JSONResponse(content={
             "running": is_running,
-            "tunnel_url": tunnel_url,
+            "tunnel_url": tunnel_state.url,
             "cursor_url": cursor_url,
-            "port": tunnel_port,
+            "port": tunnel_state.port,
             "status": "running" if is_running else "stopped"
         })
 
@@ -1076,7 +1064,7 @@ def setup_logging() -> None:
 
 def main() -> None:
     """Main function to run the API server"""
-    parser = argparse.ArgumentParser(description='OllamaLink API Server')
+    parser = argparse.ArgumentParser(description='Linx API Server')
     parser.add_argument(
         '--host',
         default='localhost',

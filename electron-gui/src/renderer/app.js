@@ -1,5 +1,5 @@
-// Simplified OllamaLink Electron GUI
-class OllamaLinkApp {
+// Simplified Linx Electron GUI
+class LinxApp {
     constructor() {
         this.serverPort = 8000;
         this.baseUrl = `http://localhost:${this.serverPort}`;
@@ -13,7 +13,7 @@ class OllamaLinkApp {
     }
 
     async init() {
-        console.log('Initializing OllamaLink GUI...');
+        console.log('Initializing Linx GUI...');
         
         try {
             // Setup event listeners first
@@ -988,7 +988,7 @@ class OllamaLinkApp {
                     { name: 'JSON Files', extensions: ['json'] },
                     { name: 'All Files', extensions: ['*'] }
                 ],
-                defaultPath: `ollamalink-requests-${new Date().toISOString().split('T')[0]}.json`
+                defaultPath: `linx-requests-${new Date().toISOString().split('T')[0]}.json`
             });
 
             if (!result.canceled) {
@@ -1069,7 +1069,7 @@ class OllamaLinkApp {
                     { name: 'JSON Files', extensions: ['json'] },
                     { name: 'All Files', extensions: ['*'] }
                 ],
-                defaultPath: 'ollamalink-config.json'
+                defaultPath: 'linx-config.json'
             });
 
             if (!result.canceled) {
@@ -1136,7 +1136,7 @@ class OllamaLinkApp {
     }
 }
 
-// Initialize the application when the DOM is loaded
+let app;
 document.addEventListener('DOMContentLoaded', () => {
-    window.app = new OllamaLinkApp();
+    app = new LinxApp();
 });

@@ -41,8 +41,8 @@ class OpenRouterRequestHandler(BaseRequestHandler):
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
-            "HTTP-Referer": "https://ollamalink.local",
-            "X-Title": "OllamaLink"
+            "HTTP-Referer": "https://linx.local",
+            "X-Title": "Linx"
         }
         
         if is_streaming:

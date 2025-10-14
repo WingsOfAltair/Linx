@@ -1,7 +1,7 @@
 {
-  "name": "ollamalink-gui",
+  "name": "linx-gui",
   "version": "0.1.0", 
-  "description": "Modern Electron GUI for OllamaLink with multi-provider AI support",
+  "description": "Modern Electron GUI for Linx with multi-provider AI support",
   "main": "src/main.js",
   "homepage": "./",
   "scripts": {
@@ -22,7 +22,7 @@
     "api",
     "proxy"
   ],
-  "author": "OllamaLink",
+  "author": "Linx",
   "license": "MIT",
   "devDependencies": {
     "electron": "^27.0.0",
@@ -33,8 +33,8 @@
     "electron-store": "^8.1.0"
   },
   "build": {
-    "appId": "com.ollamalink.gui",
-    "productName": "OllamaLink",
+    "appId": "com.linx.gui",
+    "productName": "Linx",
     "directories": {
       "output": "dist"
     },

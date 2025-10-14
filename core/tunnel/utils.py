@@ -72,12 +72,8 @@ def start_tunnel_in_thread(port: int, host: str, config: Dict[str, Any]) -> None
             print(f"\n{'-' * 40}")
             print("Tunnel started successfully!")
             api_url = f"{tunnel_url}/v1"
-            print("\nUse this URL in Cursor AI:")
+            print("\nUse this URL for Endpoints:")
             print(f"\033[1m{api_url}\033[0m")
-            print("\nInstructions:")
-            print("1. In Cursor, go to settings > AI > Configure AI Provider")
-            print("2. Choose OpenAI Compatible and paste the URL above")
-            print("3. Chat with local Ollama models in Cursor!")
             print(f"\n{'-' * 40}\n")
 
     except Exception as e:

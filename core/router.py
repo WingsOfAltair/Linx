@@ -20,7 +20,6 @@ class Router:
         self.openrouter_client = None
         self.llamacpp_client = None
         
-        # Initialize Ollama client if enabled
         ollama_config = self.config.get("ollama", {})
         if ollama_config.get("enabled", True):  # Default to enabled for backwards compatibility
             ollama_endpoint = ollama_endpoint or ollama_config.get("endpoint", "http://localhost:11434")
@@ -32,7 +31,6 @@ class Router:
             self.ollama_endpoint = None
             self.thinking_mode = False
         
-        # Initialize OpenRouter client if enabled
         openrouter_config = self.config.get("openrouter", {})
         if openrouter_config.get("enabled", False):
             api_key = openrouter_config.get("api_key")
@@ -45,7 +43,6 @@ class Router:
             else:
                 logger.warning("OpenRouter enabled but no API key provided")
         
-        # Initialize Llama.cpp client if enabled
         llamacpp_config = self.config.get("llamacpp", {})
         if llamacpp_config.get("enabled", False):
             self.llamacpp_client = LlamaCppClient(
@@ -53,26 +50,22 @@ class Router:
             )
             logger.info("Llama.cpp client initialized")
         
-        # Load model mappings
         self.ollama_mappings = self.config.get("ollama", {}).get("model_mappings", {})
         self.openrouter_mappings = self.config.get("openrouter", {}).get("model_mappings", {})
         self.llamacpp_mappings = self.config.get("llamacpp", {}).get("model_mappings", {})
         
-        # Routing configuration
         routing_config = self.config.get("routing", {})
         self.routing_config = routing_config
         self.provider_priority = routing_config.get("provider_priority", ["ollama", "llamacpp", "openrouter"])
         self.enable_fallback = routing_config.get("enable_fallback", True)
         self.cost_optimization = routing_config.get("cost_optimization", True)
         
-        # Provider health tracking
         self.provider_health = {
             "ollama": {"available": bool(self.ollama_client), "last_check": 0, "consecutive_failures": 0},
             "openrouter": {"available": bool(self.openrouter_client), "last_check": 0, "consecutive_failures": 0},
             "llamacpp": {"available": bool(self.llamacpp_client), "last_check": 0, "consecutive_failures": 0}
         }
         
-        # Initialize models for all clients
         if self.ollama_client:
             try:
                 models = self.ollama_client.fetch_models()
@@ -95,14 +88,13 @@ class Router:
         logger.info(f"OpenRouter mappings: {self.openrouter_mappings}")
         logger.info(f"Ollama mappings: {self.ollama_mappings}")
     
-
-    
     async def _make_ollama_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
         """Make a direct HTTP request to Ollama."""
         url = f"{self.ollama_endpoint}/api/chat"
         
         try:
-            async with httpx.AsyncClient(timeout=180.0) as client:
+            timeout = httpx.Timeout(180.0, connect=30.0)
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.post(url, json=request_data)
                 
                 if response.status_code == 200:
@@ -128,7 +120,8 @@ class Router:
         url = f"{self.ollama_endpoint}/api/chat"
         
         try:
-            async with httpx.AsyncClient(timeout=180.0) as client:
+            timeout = httpx.Timeout(180.0, connect=30.0, read=None)
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 async with client.stream("POST", url, json=request_data) as response:
                     if response.status_code != 200:
                         error_msg = {

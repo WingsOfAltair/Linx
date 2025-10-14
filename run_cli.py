@@ -19,7 +19,7 @@ logging.basicConfig(
     level=logging.WARNING,
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 )
-logger = logging.getLogger("ollamalink")
+logger = logging.getLogger("linx")
 
 HEADER_COLOR = 'green'
 SUBHEADER_COLOR = 'cyan'
@@ -160,10 +160,10 @@ def display_model_error(error_message, error_type):
     print(f"\n{DIVIDER}\n")
 
 def main():
-    """Run the OllamaLink server."""
+    """Run the Linx server."""
     config = load_config(Path("config.json"))
     
-    parser = argparse.ArgumentParser(description="OllamaLink - Connect Cursor AI to Ollama models")
+    parser = argparse.ArgumentParser(description="Linx - Unified AI model endpoint for local and remote providers")
     
     parser.add_argument("--port", "-p", type=int, 
                         default=config["server"]["port"],
@@ -218,8 +218,8 @@ def main():
         args.tunnel = False
     
     f = Figlet(font='slant')
-    print(termcolor.colored(f.renderText('OllamaLink'), HEADER_COLOR))
-    print(termcolor.colored("Connect Cursor with Ollama models\n", SUBHEADER_COLOR))
+    print(termcolor.colored(f.renderText('Linx'), HEADER_COLOR))
+    print(termcolor.colored("Unify local and remote models into one OpenAI-compatible endpoint\n", SUBHEADER_COLOR))
     
     print(termcolor.colored("Configuration:", INFO_COLOR, attrs=['bold']))
     print(f"• Ollama endpoint: {args.ollama}")
@@ -237,8 +237,8 @@ def main():
     # Check Ollama client connection
     if router.ollama_client and router.ollama_client.connection_error:
         display_model_error(router.ollama_client.connection_error, "connection_error")
-        print(termcolor.colored("Warning: OllamaLink will still start, but it won't be able to use models from Ollama", INFO_COLOR))
-        print(termcolor.colored("OllamaLink will use fallback settings until Ollama is available", INFO_COLOR))
+        print(termcolor.colored("Warning: Linx will still start, but it won't be able to use models from Ollama", INFO_COLOR))
+        print(termcolor.colored("Linx will use fallback settings until Ollama is available", INFO_COLOR))
     elif router.ollama_client and router.ollama_client.available_models:
         print(termcolor.colored(f"Success: Found {len(router.ollama_client.available_models)} Ollama models:", SUCCESS_COLOR, attrs=['bold']))
         for model in router.ollama_client.available_models:
@@ -302,7 +302,7 @@ def main():
         # Update config with CLI-provided tunnel type
         config["tunnel"]["type"] = args.tunnel_type
         print(f"\n{DIVIDER}")
-        print(termcolor.colored("Starting OllamaLink server with tunnel support...", INFO_COLOR, attrs=['bold']))
+        print(termcolor.colored("Starting Linx server with tunnel support...", INFO_COLOR, attrs=['bold']))
         print("Waiting for tunnel to start...")
         print(f"{DIVIDER}\n")
         
@@ -324,14 +324,14 @@ def main():
         local_url = f"http://{host_display}:{args.port}/v1"
         
         print(f"\n{DIVIDER}")
-        print(termcolor.colored("Starting OllamaLink server in direct mode...", INFO_COLOR, attrs=['bold']))
+        print(termcolor.colored("Starting Linx server in direct mode...", INFO_COLOR, attrs=['bold']))
         print(f"{DIVIDER}\n")
         print(termcolor.colored("Use this URL in Cursor AI:", INFO_COLOR, attrs=['bold']))
         print(termcolor.colored(f"{local_url}", CODE_COLOR, attrs=['bold']))
         print()
         print(termcolor.colored("Important:", ERROR_COLOR, attrs=['bold']))
         print("You're running in direct mode without a tunnel.")
-        print("Cursor AI must be running on the same machine as OllamaLink.")
+        print("Cursor AI must be running on the same machine as Linx.")
         print()
         print(termcolor.colored("Instructions:", INFO_COLOR, attrs=['bold']))
         print("1. In Cursor, go to settings > AI > Configure AI Provider")
@@ -346,7 +346,7 @@ def main():
     if args.debug:
         # Raise root log level for our modules
         logging.getLogger().setLevel(logging.DEBUG)
-        for name in ["core", "ollamalink", "uvicorn", "httpx"]:
+        for name in ["core", "linx", "uvicorn", "httpx"]:
             logging.getLogger(name).setLevel(logging.DEBUG)
         print(termcolor.colored("Debug logging enabled", INFO_COLOR))
 

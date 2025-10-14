@@ -1,5 +1,5 @@
 """
-localhost.run tunnel provider for OllamaLink.
+localhost.run tunnel provider for Linx.
 """
 import asyncio
 import logging

@@ -18,15 +18,15 @@ try:
         long_description = fh.read()
 except FileNotFoundError:
     print(f"Warning: Could not find README file at {readme_path}")
-    long_description = "OllamaLink - A connector for using local Ollama models in Cursor AI"
+    long_description = "Linx - A connector for using local Ollama models in Cursor AI"
 
 # Determine if we're building GUI or CLI
-APP_NAME = "OllamaLink"
+APP_NAME = "Linx"
 is_cli = False
 if '--cli' in sys.argv:
     is_cli = True
     sys.argv.remove('--cli')
-    APP_NAME = "OllamaLink-CLI"
+    APP_NAME = "Linx-CLI"
 
 # Additional data files to include
 DATA_FILES = [
@@ -35,14 +35,14 @@ DATA_FILES = [
 
 # Common base configuration
 setup_args = dict(
-    name="ollamalink",
+    name="linx",
     version="0.1.0",
     author="Python Port",
     author_email="example@example.com", 
     description="A connector for using local Ollama models in Cursor AI",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/username/ollamalink",
+    url="https://github.com/username/linx",
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -63,7 +63,7 @@ setup_args = dict(
     },
     entry_points={
         "console_scripts": [
-            "ollamalink=ollamalink.cli:main",
+            "linx=linx.cli:main",
         ],
     },
 )
@@ -81,7 +81,7 @@ if 'py2app' in sys.argv:
         'plist': {
             'CFBundleName': APP_NAME,
             'CFBundleDisplayName': APP_NAME,
-            'CFBundleIdentifier': f'com.example.ollamalink{".cli" if is_cli else ""}',
+            'CFBundleIdentifier': f'com.example.linx{".cli" if is_cli else ""}',
             'CFBundleVersion': '0.1.0',
             'CFBundleShortVersionString': '0.1.0',
             'NSHumanReadableCopyright': '© 2023 Python Port',
@@ -148,10 +148,10 @@ To create Windows executables with PyInstaller:
    pip install pyinstaller
 
 2. Build GUI version:
-   pyinstaller --name OllamaLink-GUI --onefile --windowed --icon=icon.ico --add-data "config.json;." run_gui.py
+   pyinstaller --name Linx-GUI --onefile --windowed --icon=icon.ico --add-data "config.json;." run_gui.py
 
 3. Build CLI version:
-   pyinstaller --name OllamaLink-CLI --onefile --console --icon=icon.ico --add-data "config.json;." run_cli.py
+   pyinstaller --name Linx-CLI --onefile --console --icon=icon.ico --add-data "config.json;." run_cli.py
 
 The executables will be created in the dist/ directory.
 """)

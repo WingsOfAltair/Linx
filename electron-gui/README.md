@@ -1,6 +1,6 @@
-# OllamaLink Electron GUI
+# Linx Electron GUI
 
-A modern, standalone desktop application for OllamaLink with multi-provider AI support including Ollama and OpenRouter.ai.
+A modern, standalone desktop application for Linx with multi-provider AI support including Ollama and OpenRouter.ai.
 
 ## Features
 
@@ -113,7 +113,7 @@ electron-gui/
 
 ## Troubleshooting
 
-1. **Backend won't start**: Ensure Python dependencies are installed and the parent directory contains the OllamaLink core modules.
+1. **Backend won't start**: Ensure Python dependencies are installed and the parent directory contains the Linx core modules.
 
 2. **Port conflicts**: The app automatically finds available ports, but you can check the console for port information.
 
@@ -123,4 +123,4 @@ electron-gui/
 
 ## License
 
-Same as parent OllamaLink project.
+Same as parent Linx project.

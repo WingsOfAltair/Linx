@@ -3,25 +3,17 @@ import json
 import asyncio
 import logging
 import subprocess
-# Token counting stub, since we can't import tiktoken
-def estimate_message_tokens(messages, encoding_name="cl100k_base"):
-    # Very rough estimate - 4 chars per token
-    return sum(len(str(msg)) // 4 for msg in messages)
-
-def count_tokens_in_messages(messages, encoding_name="cl100k_base"):
-    # Very rough estimate - 4 chars per token
-    return len(str(messages)) // 4
 from pathlib import Path
 from urllib.parse import urlparse
 import platform
 from typing import Dict, Any, Optional, Tuple, List
 
-logger = logging.getLogger("ollamalink")
-
+logger = logging.getLogger("linx")
 try:
-    cl100k_encoder = tiktoken.get_encoding("cl100k_base") 
-except Exception as e:
-    logger.warning(f"Failed to load tiktoken encoder: {str(e)}. Falling back to character-based estimation.")
+    import tiktoken
+    cl100k_encoder = tiktoken.get_encoding("cl100k_base")
+except (ImportError, Exception) as e:
+    logger.debug(f"tiktoken not available: {str(e)}. Using character-based estimation.")
     cl100k_encoder = None
 
 def is_valid_url(url: str) -> bool:
@@ -72,7 +64,6 @@ def load_config(config_path) -> Dict[str, Any]:
         with open(config_path, "r") as f:
             config = json.load(f)
             
-        # Ensure the required sections exist
         if "server" not in config:
             config["server"] = {"port": 8080, "hostname": "127.0.0.1"}
             
@@ -115,8 +106,6 @@ async def start_localhost_run_tunnel(port: int, callback=None) -> Optional[Tuple
                                   or None if the tunnel couldn't be started
     """
     logger.info("Starting localhost.run tunnel...")
-    
-    # Check if another instance of the tunnel might already be running
     try:
         if platform.system() == "Windows":
             check_process = subprocess.run(
@@ -167,10 +156,6 @@ async def start_localhost_run_tunnel(port: int, callback=None) -> Optional[Tuple
         if result.returncode != 0:
             logger.error("SSH is not installed or not found in PATH")
             return None
-        
-        # Start SSH tunnel to localhost.run
-        # Use -R 80:localhost:port to create a tunnel from the 
-        # localhost.run server to our local server on the specified port
         process = await asyncio.create_subprocess_exec(
             "ssh", 
             "-o", "ServerAliveInterval=60", 
@@ -223,8 +208,6 @@ async def start_localhost_run_tunnel(port: int, callback=None) -> Optional[Tuple
                                 callback(tunnel_url)
                                 
                             return tunnel_url, process
-                
-                # Pattern 2: Line containing "is forwarding to localhost:port"
                 elif f"forwarding to localhost:{port}" in line_str:
                     match = re.search(r'https?://[a-zA-Z0-9.-]+\.(lhr\.life|localhost\.run)', line_str)
                     if match:
@@ -237,8 +220,6 @@ async def start_localhost_run_tunnel(port: int, callback=None) -> Optional[Tuple
                                 callback(tunnel_url)
                                 
                             return tunnel_url, process
-                
-                # Pattern 3: Line contains "Follow" - typically "Follow this link:"
                 elif "Follow" in line_str:
                     match = re.search(r'https?://[a-zA-Z0-9.-]+\.(lhr\.life|localhost\.run)', line_str)
                     if match:
@@ -251,8 +232,6 @@ async def start_localhost_run_tunnel(port: int, callback=None) -> Optional[Tuple
                                 callback(tunnel_url)
                                 
                             return tunnel_url, process
-                
-                # Pattern 4: Line contains the word "your connection" with hostname pattern
                 elif "your connection" in line_str.lower():
                     match = re.search(r'https?://[a-zA-Z0-9.-]+\.(lhr\.life|localhost\.run)', line_str)
                     if match:
@@ -264,9 +243,7 @@ async def start_localhost_run_tunnel(port: int, callback=None) -> Optional[Tuple
                             if callback:
                                 callback(tunnel_url)
                                 
-                            return tunnel_url, process
-                
-                # Pattern 5: Line contains "https://" and ".lhr.life" 
+                            return tunnel_url, process 
                 elif "https://" in line_str and ".lhr.life" in line_str:
                     match = re.search(r'https?://[a-zA-Z0-9.-]+\.lhr\.life', line_str)
                     if match:
@@ -292,8 +269,6 @@ async def start_localhost_run_tunnel(port: int, callback=None) -> Optional[Tuple
                                 callback(tunnel_url)
                                 
                             return tunnel_url, process
-                
-                # Pattern 7: Line contains "tunneled through" - common in nokey output
                 elif "tunneled through" in line_str.lower():
                     match = re.search(r'https?://[a-zA-Z0-9.-]+\.(lhr\.life|localhost\.run)', line_str)
                     if match:
@@ -306,8 +281,6 @@ async def start_localhost_run_tunnel(port: int, callback=None) -> Optional[Tuple
                                 callback(tunnel_url)
                                 
                             return tunnel_url, process
-                
-                # Pattern 8: Numeric subdomain pattern - fallback
                 elif re.search(r'\d+\.(lhr\.life|localhost\.run)', line_str):
                     match = re.search(r'https?://\d+\.(lhr\.life|localhost\.run)', line_str)
                     if match:
@@ -320,8 +293,6 @@ async def start_localhost_run_tunnel(port: int, callback=None) -> Optional[Tuple
                                 callback(tunnel_url)
                                 
                             return tunnel_url, process
-                
-                # Pattern 9: General URL detection - fallback
                 elif re.search(r'https?://[a-zA-Z0-9.-]+\.(lhr\.life|localhost\.run)', line_str):
                     match = re.search(r'https?://[a-zA-Z0-9.-]+\.(lhr\.life|localhost\.run)', line_str)
                     if match:
@@ -385,17 +356,12 @@ def estimate_message_tokens(message: Dict[str, Any]) -> int:
         return 0
     
     content = message["content"]
-    # Role is handled by the caller
-    _ = message.get("role", "user")
     
     if not content:
         return 0
     
     if isinstance(content, str):
-        char_count = len(content)
-        token_estimate = char_count / 4
-    
-        return int(token_estimate) + 5
+        return int(len(content) / 4) + 5
 
     elif isinstance(content, list):
         total = 0
@@ -403,7 +369,7 @@ def estimate_message_tokens(message: Dict[str, Any]) -> int:
             if isinstance(item, dict):
                 if item.get("type") == "text" and "text" in item:
                     total += len(item["text"]) / 4
-                elif item.get("type") == "image_url" and "image_url" in item:
+                elif item.get("type") == "image_url":
                     total += 50
             elif isinstance(item, str):
                 total += len(item) / 4

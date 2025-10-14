@@ -24,7 +24,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "Ollamalink"
+name = "Linx"
 version = "1.0.0"
 description = "A bridge application connecting local Ollama models or OpenRouter.ai for hybrid AI model access"
 readme = "readme.md"
@@ -49,7 +49,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-keywords = ["ollama", "openrouter", "ai", "llm", "api", "bridge"]
+keywords = ["linx", "ollama", "openrouter", "ai", "llm", "api", "bridge"]
 requires-python = ">=3.8"
 
 dependencies = [
@@ -81,13 +81,13 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/pascalseeber/ollamalink"
-Repository = "https://github.com/pascalseeber/ollamalink"
-Issues = "https://github.com/pascalseeber/ollamalink/issues"
-Documentation = "https://github.com/pascalseeber/ollamalink#readme"
+Homepage = "https://github.com/pascalseeber/linx"
+Repository = "https://github.com/pascalseeber/linx"
+Issues = "https://github.com/pascalseeber/linx/issues"
+Documentation = "https://github.com/pascalseeber/linx#readme"
 
 [project.scripts]
-ollamalink = "ollamalink.cli:main"
+linx = "linx.cli:main"
 
 [tool.black]
 line-length = 88

@@ -29,8 +29,8 @@ class OpenRouterClient(BaseClient):
         return {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://github.com/yourusername/ollamalink",
-            "X-Title": "OllamaLink"
+            "HTTP-Referer": "https://github.com/yourusername/linx",
+            "X-Title": "Linx"
         }
     
     def test_connection(self) -> Dict[str, Any]:

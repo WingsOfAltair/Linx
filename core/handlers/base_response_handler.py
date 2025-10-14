@@ -80,7 +80,7 @@ class BaseResponseHandler(ABC):
                 "completion_tokens": token_usage.get("completion_tokens", 0),
                 "total_tokens": token_usage.get("prompt_tokens", 0) + token_usage.get("completion_tokens", 0)
             },
-            "system_fingerprint": "ollamalink-server"
+            "system_fingerprint": "linx-server"
         }
     
     def format_openai_error(self, error_message: str, error_code: int = 500) -> Dict[str, Any]:

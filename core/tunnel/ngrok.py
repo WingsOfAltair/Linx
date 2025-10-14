@@ -1,5 +1,5 @@
 """
-ngrok tunnel provider for OllamaLink.
+ngrok tunnel provider for Linx.
 """
 import asyncio
 import logging
@@ -49,7 +49,7 @@ class NgrokProvider(TunnelProvider):
             return Path(which_path)
 
         # Check for bundled ngrok
-        app_dir = Path.home() / ".ollamalink"
+        app_dir = Path.home() / ".linx"
         app_dir.mkdir(exist_ok=True)
         ngrok_dir = app_dir / "ngrok"
         ngrok_dir.mkdir(exist_ok=True)

@@ -1,5 +1,5 @@
 """
-Tunnel provider interface and factory for OllamaLink.
+Tunnel provider interface and factory for Linx.
 """
 import abc
 import logging
