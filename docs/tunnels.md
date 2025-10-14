@@ -1,6 +1,6 @@
-# OllamaLink Tunnel Support
+# Support
 
-OllamaLink supports multiple tunnel providers to make your local Ollama models accessible from other devices or locations. This document covers the available tunnel options and how to configure them.
+Linx supports multiple tunnel providers to make your local Ollama models accessible from other devices or locations. This document covers the available tunnel options and how to configure them.
 
 ## Available Tunnel Providers
 
@@ -30,12 +30,12 @@ The tunnel behavior can be controlled using command-line arguments:
 
 ```bash
 # Enable/disable tunneling
-ollamalink-cli --tunnel       # Enable tunneling (default)
-ollamalink-cli --no-tunnel    # Disable tunneling
+linx-cli --tunnel       # Enable tunneling (default)
+linx-cli --no-tunnel    # Disable tunneling
 
 # Select tunnel provider
-ollamalink-cli --tunnel-type localhost_run    # Use localhost.run (default)
-ollamalink-cli --tunnel-type ngrok            # Use ngrok
+linx-cli --tunnel-type localhost_run    # Use localhost.run (default)
+linx-cli --tunnel-type ngrok            # Use ngrok
 ```
 
 ### Configuration File
@@ -74,7 +74,7 @@ The localhost.run tunnel provider only requires SSH to be installed and availabl
 ### ngrok
 1. Install the ngrok dependency:
    ```bash
-   pip install ollamalink[ngrok]
+   pip install linx[ngrok]
    ```
 
 2. Get your ngrok authentication token:
@@ -96,7 +96,7 @@ The localhost.run tunnel provider only requires SSH to be installed and availabl
 
 ## Notes
 
-- If a tunnel provider fails to connect, OllamaLink will automatically fall back to localhost.run
+- If a tunnel provider fails to connect, Linx will automatically fall back to localhost.run
 - The tunnel URL is displayed in the console when the server starts
 - For security, always use HTTPS URLs provided by the tunnel services
-- Tunnel connections are terminated when OllamaLink is stopped
+- Tunnel connections are terminated when Linx is stopped
