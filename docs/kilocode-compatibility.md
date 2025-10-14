@@ -1,6 +1,6 @@
 # Kilocode Compatibility Changes
 
-This document outlines the changes made to OllamaLink to ensure compatibility with Kilocode's chat interface.
+This document outlines the changes made to Linx to ensure compatibility with Kilocode's chat interface.
 
 ## Changes Overview
 
@@ -108,7 +108,7 @@ timeout = httpx.Timeout(
 
 To verify Kilocode compatibility:
 
-1. Configure Kilocode to use your OllamaLink instance:
+1. Configure Kilocode to use your Linx instance:
    - Use `/api/chat` for direct Ollama mode
    - Use `/v1/chat/completions` for OpenAI compatibility mode
 
@@ -120,16 +120,3 @@ To verify Kilocode compatibility:
    # Test OpenAI compatibility (SSE)
    curl -N http://localhost:8000/v1/chat/completions -H "Content-Type: application/json" -d '{"model":"llama2","messages":[{"role":"user","content":"Hello"}]}'
    ```
-
-## Known Limitations
-
-1. SSE heartbeats are only sent every 5 seconds
-2. Some older clients might not handle chunked transfer encoding properly
-3. Connection timeouts are fixed at 5 minutes
-
-## Future Improvements
-
-1. Make timeout and keepalive settings configurable
-2. Add support for bidirectional streaming
-3. Implement request/response validation
-4. Add support for function calling format
