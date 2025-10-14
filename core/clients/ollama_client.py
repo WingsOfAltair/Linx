@@ -161,8 +161,8 @@ class OllamaClient(BaseClient):
         return processed_messages
     
     async def stream_chat_completion(self, model: str, messages: List[Dict[str, Any]],
-                                   temperature: float = 0.7, max_tokens: Optional[int] = None) -> AsyncGenerator[Dict[str, Any], None]:
-        """Stream a chat completion from Ollama."""
+                                   temperature: float = 0.7, max_tokens: Optional[int] = None) -> AsyncGenerator[str, None]:
+        """Stream a chat completion from Ollama as OpenAI-compatible SSE."""
         # Process messages to handle tool responses and other roles
         processed_messages = self.process_messages(messages, self.thinking_mode)
         
@@ -195,39 +195,25 @@ class OllamaClient(BaseClient):
                             logger.error(f"Failed to read error response: {str(e)}")
                         
                         logger.error(error_msg)
-                        yield {
+                        error_chunk = {
                             "error": {"message": error_msg, "code": response.status_code}
                         }
+                        yield f"data: {json.dumps(error_chunk)}\n\n"
+                        yield "data: [DONE]\n\n"
                         return
                     
                     logger.info("Starting to stream response from Ollama")
-                    got_response = False
                     
-                    async for line in response.aiter_lines():
-                        line = line.strip()
-                        if line:
-                            try:
-                                chunk = json.loads(line)
-                                if not got_response:
-                                    logger.info("Received first chunk from Ollama")
-                                    got_response = True
-                                logger.debug(f"Received chunk: {json.dumps(chunk)[:200]}...")
-                                yield chunk
-                            except json.JSONDecodeError as e:
-                                logger.warning(f"Failed to parse JSON: {line[:100]}... Error: {str(e)}")
-                                continue
-                    
-                    if not got_response:
-                        logger.error("No response received from Ollama")
-                        yield {
-                            "error": {"message": "No response received from provider", "code": 500}
-                        }
+                    async for chunk in self.response_handler.stream_response(response, model):
+                        yield chunk
                                 
         except Exception as e:
             logger.error(f"Ollama streaming error: {str(e)}")
-            yield {
-                "error": {"message": f"Streaming failed: {str(e)}"}
+            error_chunk = {
+                "error": {"message": f"Streaming failed: {str(e)}", "code": 500}
             }
+            yield f"data: {json.dumps(error_chunk)}\n\n"
+            yield "data: [DONE]\n\n"
     
     async def chat_completion(self, model: str, messages: List[Dict[str, Any]], 
                             temperature: float = 0.7, max_tokens: Optional[int] = None,

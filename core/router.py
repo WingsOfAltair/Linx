@@ -180,9 +180,11 @@ class Router:
                                 continue
         except Exception as e:
             logger.error(f"Ollama streaming failed: {str(e)}")
-            yield {
-                "error": {"message": f"Streaming failed: {str(e)}"}
+            error_chunk = {
+                "error": {"message": f"Streaming failed: {str(e)}", "code": 500}
             }
+            yield f"data: {json.dumps(error_chunk)}\n\n"
+            yield "data: [DONE]\n\n"
     
     async def determine_provider_and_model(self, requested_model: str) -> Tuple[str, str, str]:
         """

@@ -77,7 +77,7 @@ class BaseClient(ABC):
     
     @abstractmethod
     async def stream_chat_completion(self, model: str, messages: List[Dict[str, Any]],
-                                   temperature: float = 0.7, max_tokens: Optional[int] = None) -> AsyncGenerator[Dict[str, Any], None]:
+                                   temperature: float = 0.7, max_tokens: Optional[int] = None) -> AsyncGenerator[str, None]:
         """
         Stream a chat completion request.
         Args:
@@ -85,7 +85,7 @@ class BaseClient(ABC):
             messages: List of message dictionaries
             temperature: Generation temperature
             max_tokens: Maximum tokens to generate
-        Yields: Response chunks as dictionaries
+        Yields: Response chunks encoded as Server-Sent Events (strings)
         """
         pass
     
