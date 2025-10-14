@@ -13,6 +13,7 @@ from pyfiglet import Figlet
 from core.api import create_api
 from core.router import Router
 from core.util import load_config
+from core.tunnel.utils import start_tunnel_in_thread
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -181,7 +182,12 @@ def main():
     
     parser.add_argument("--tunnel", "-t", action="store_true", 
                         default=config["tunnel"]["use_tunnel"],
-                        help="Use localhost.run tunnel (default: on)")
+                        help="Use tunnel (default: on)")
+    
+    parser.add_argument("--tunnel-type",
+                        default=config["tunnel"].get("type", "localhost_run"),
+                        choices=["localhost_run", "ngrok"],
+                        help="Tunnel provider to use (default: localhost_run)")
     
     parser.add_argument("--no-tunnel", dest="tunnel", action="store_false",
                         help="Disable tunnel")
@@ -293,14 +299,17 @@ def main():
     # Determine host setting based on tunnel mode
     if args.tunnel:
         host = "127.0.0.1"
+        # Update config with CLI-provided tunnel type
+        config["tunnel"]["type"] = args.tunnel_type
         print(f"\n{DIVIDER}")
         print(termcolor.colored("Starting OllamaLink server with tunnel support...", INFO_COLOR, attrs=['bold']))
+        print("Waiting for tunnel to start...")
         print(f"{DIVIDER}\n")
         
         # Start tunnel in background thread after server starts
         tunnel_thread = threading.Thread(
-            target=auto_start_tunnel, 
-            args=(args.port, host),
+            target=start_tunnel_in_thread, 
+            args=(args.port, host, config["tunnel"]),
             daemon=True
         )
         tunnel_thread.start()

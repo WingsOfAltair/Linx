@@ -56,11 +56,14 @@ setup_args = dict(
         "httpx>=0.25.1",
         "pyfiglet>=1.0.2",
         "termcolor>=2.3.0",
-        "requests>=2.31.0",
+        "requests>=2.31.0"
     ],
+    extras_require={
+        'ngrok': ['pyngrok>=6.0.0'],
+    },
     entry_points={
         "console_scripts": [
-            "ollamalink-cli=run_cli:main",
+            "ollamalink=ollamalink.cli:main",
         ],
     },
 )

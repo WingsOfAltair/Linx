@@ -47,6 +47,14 @@
     },
     "tunnel": {
         "use_tunnel": true,
-        "type": "localhost_run"
+        "type": "localhost_run",
+        "providers": {
+            "localhost_run": {},
+            "ngrok": {
+                "authtoken": "",
+                "region": "us",
+                "edge": "edg"
+            }
+        }
     }
 }

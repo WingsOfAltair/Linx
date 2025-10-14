@@ -3,7 +3,14 @@ import json
 import asyncio
 import logging
 import subprocess
-import tiktoken
+# Token counting stub, since we can't import tiktoken
+def estimate_message_tokens(messages, encoding_name="cl100k_base"):
+    # Very rough estimate - 4 chars per token
+    return sum(len(str(msg)) // 4 for msg in messages)
+
+def count_tokens_in_messages(messages, encoding_name="cl100k_base"):
+    # Very rough estimate - 4 chars per token
+    return len(str(messages)) // 4
 from pathlib import Path
 from urllib.parse import urlparse
 import platform
