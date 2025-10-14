@@ -1,28 +1,29 @@
 # Linx
 
-**Connect Cursor AI to your local Ollama or OpenRouter.ai models**
+**Unify local and remote models into one OpenAI-compatible endpoint**
 
-Linx is a bridge application that connects **Cursor AI** to your **local Ollama models** or **cloud-based OpenRouter.ai models**. It acts as an **OpenAI-compatible endpoint** and supports **hybrid model routing** between local and remote providers. Currently, only the **CLI version** is fully functional — the **GUI** is in active development.
+Linx is a bridge application that connects **local models** (via Ollama) and **remote models** (via OpenRouter.ai or other OpenAI-compatible providers) under a single unified API. It exposes all connected models through an **OpenAI-compatible interface**, allowing seamless use in applications like **Cursor AI**, **VSCode extensions**, or any client supporting the OpenAI API format. Both **CLI** and **GUI** versions exist, with the CLI being fully functional and the GUI in active development.
 
 ## Features
 
-* **Hybrid Access** — Connect to both local Ollama and OpenRouter models
-* **OpenAI-Compatible** — Standard `/v1` API endpoint
-* **Private** — Keep your code and data local
-* **Flexible** — Works with any Ollama or OpenRouter model
-* **Routing Logic** — Automatic provider priority and fallback
+* **Unified Endpoint** — Merge local and remote models into one `/v1` API
+* **Hybrid Access** — Combine Ollama, OpenRouter, or other APIs
+* **OpenAI-Compatible** — Works with any OpenAI-style client
+* **Private** — Keep your data local when using Ollama
+* **Flexible** — Compatible with multiple AI model providers
+* **Routing Logic** — Automatic provider selection and fallback
 * **Tunneling** — Public access via `localhost.run`
-* **CLI Ready** — Full feature support
-* **GUI (coming soon)** — Model dashboard and monitoring
-* **Model Mapping** — Map names like `gpt-4o` → `qwen2.5`
-* **Secure** — Optional API key usage
+* **CLI Ready** — Fully functional command-line version
+* **GUI (coming soon)** — Visual management dashboard
+* **Model Mapping** — Custom model name mapping
+* **Secure** — Optional API key protection
 * **No Timeout Limits** — Long-running tasks supported
 
 ## Quick Start
 
 ### 1. Install Ollama
 
-Make sure Ollama is installed and running:
+Ensure Ollama is installed and running:
 
 ```sh
 ollama serve
@@ -40,33 +41,24 @@ pip install -r requirements.txt
 python run_cli.py
 ```
 
-*Note: GUI version is not yet functional.*
+*Note: GUI version is in development.*
 
-## Setting Up Cursor
+## Integration
 
-### 1. Install Cursor
+Linx can be integrated with any OpenAI-compatible tool or application. Example use cases:
 
-Download from [https://cursor.sh](https://cursor.sh)
+* **Cursor AI** — override the API URL with Linx’s endpoint
+* **VSCode or JetBrains plugins** — connect as OpenAI-compatible API
+* **Custom scripts or dashboards** — query Linx directly via REST
 
-### 2. Start Linx
+## Endpoints
 
-You will see two endpoints:
+When started, Linx provides:
 
 * **Local URL:** `http://localhost:8080/v1`
 * **Tunnel URL:** `https://randomsubdomain.localhost.run/v1`
 
-Use:
-
-* **Local URL** → when Cursor runs on the same machine
-* **Tunnel URL** → for remote/cloud access
-
-### 3. Configure in Cursor
-
-1. Open **Settings → Models**
-2. In “Override OpenAI Base URL” paste your Linx URL (must end with `/v1`)
-3. Enter API key (if configured)
-4. Press **Verify**
-5. Add mapped models (e.g. `qwen2.5`, `llama3`)
+Use the local URL for same-machine access or the tunnel URL for remote clients.
 
 ## Configuration
 
@@ -106,24 +98,6 @@ Example `config.json`:
 }
 ```
 
-## OpenRouter Setup
-
-1. Get an API key at [https://openrouter.ai](https://openrouter.ai)
-2. Enable OpenRouter in `config.json`:
-
-   ```json
-   "openrouter": {
-       "enabled": true,
-       "api_key": "sk-or-xxxx",
-       "endpoint": "https://openrouter.ai/api/v1"
-   }
-   ```
-3. Run Linx:
-
-   ```sh
-   python run_cli.py
-   ```
-
 ## CLI Usage
 
 ```sh
@@ -140,7 +114,7 @@ python run_cli.py [options]
 
 ## Model Mapping
 
-Map commercial model names to local or remote ones. Example:
+Map model names between providers:
 
 ```json
 "model_mappings": {
@@ -149,7 +123,7 @@ Map commercial model names to local or remote ones. Example:
 }
 ```
 
-Fuzzy matching resolves variants automatically.
+Supports fuzzy matching for variant names.
 
 ## Build Executables
 
@@ -167,10 +141,13 @@ python setup.py py2app --cli
 
 ## Recent Changes
 
-* Unified support for **Ollama** and **OpenRouter**
-* **OpenAI-compatible API** (`/v1`)
-* **Provider routing**, **fallback**, and **health monitoring**
-* **GUI** in development
+### Rebrand
+
+* **Renamed:** OllamaLink → **Linx**
+* Unified **Ollama**, **OpenRouter**, and **other APIs** into one endpoint
+* Fully **OpenAI-compatible** `/v1` API
+* Added provider routing, fallback, and health checks
+* GUI in development
 
 ## License
 
