@@ -15,13 +15,13 @@ class OllamaClient(BaseClient):
     Handles model discovery, chat completions, and streaming for Ollama.
     """
     
-    def __init__(self, endpoint: str = "http://localhost:11434"):
+    def __init__(self, endpoint: str = "http://localhost:11434", thinking_mode: bool = True):
         super().__init__(endpoint, "Ollama")
 
         # Initialize handlers
         self.request_handler = OllamaRequestHandler(endpoint)
         self.response_handler = OllamaResponseHandler()
-
+        self.thinking_mode = thinking_mode
     
     def test_connection(self) -> Dict[str, Any]:
         """Test the connection to Ollama API."""
@@ -133,23 +133,101 @@ class OllamaClient(BaseClient):
         return default_model
     
     def process_messages(self, messages: List[Dict[str, Any]], thinking_mode: bool = True) -> List[Dict[str, Any]]:
-        """Process messages based on thinking mode setting."""
-        if thinking_mode:
-            return messages
-            
+        """Process messages and handle special roles."""
         processed_messages = []
-        for message in messages:
-            if message.get("role") == "user" and "content" in message:
-                content = message["content"]
-                
-                if isinstance(content, str) and not content.startswith("/no_think"):
-                    message = message.copy()
-                    message["content"] = f"/no_think {content}"
-                    logger.info(f"Added /no_think prefix to user message (thinking mode disabled)")
-                    
-            processed_messages.append(message)
+        for msg in messages:
+            role = msg.get("role", "").lower()
+            content = msg.get("content", "")
             
+            if role == "tool" or role == "function":
+                # Convert tool/function messages to assistant messages
+                name = msg.get("name", "tool")
+                processed_messages.append({
+                    "role": "assistant",
+                    "content": f"[{role.title()} {name}] {content}"
+                })
+                logger.debug(f"Converted {role} message to assistant message")
+            else:
+                # Map any other role to one of user/assistant/system
+                mapped_role = "user" if role not in ["system", "assistant"] else role
+                
+                # Handle thinking mode for user messages
+                if not thinking_mode and mapped_role == "user" and not content.startswith("/no_think"):
+                    content = f"/no_think {content}"
+                    logger.debug("Added /no_think prefix to user message (thinking mode disabled)")
+                    
+                processed_messages.append({"role": mapped_role, "content": content})
+        
         return processed_messages
+    
+    async def stream_chat_completion(self, model: str, messages: List[Dict[str, Any]],
+                                   temperature: float = 0.7, max_tokens: Optional[int] = None) -> AsyncGenerator[Dict[str, Any], None]:
+        """Stream a chat completion from Ollama."""
+        # Process messages to handle tool responses and other roles
+        processed_messages = self.process_messages(messages, self.thinking_mode)
+        
+        request_data = {
+            "model": model,
+            "messages": processed_messages,
+            "temperature": temperature,
+            "stream": True
+        }
+        
+        if max_tokens:
+            request_data["max_tokens"] = max_tokens
+        
+        try:
+            logger.info(f"Sending request to Ollama: {json.dumps(request_data, indent=2)}")
+            async with httpx.AsyncClient(timeout=180.0) as client:
+                async with client.stream(
+                    "POST",
+                    f"{self.endpoint}/api/chat",
+                    json=request_data,
+                    headers={"Content-Type": "application/json"}
+                ) as response:
+                    if response.status_code != 200:
+                        error_msg = f"Ollama returned status: {response.status_code}"
+                        try:
+                            error_text = await response.aread()
+                            if error_text:
+                                error_msg = f"{error_msg} - {error_text.decode('utf-8')}"
+                        except Exception as e:
+                            logger.error(f"Failed to read error response: {str(e)}")
+                        
+                        logger.error(error_msg)
+                        yield {
+                            "error": {"message": error_msg, "code": response.status_code}
+                        }
+                        return
+                    
+                    logger.info("Starting to stream response from Ollama")
+                    got_response = False
+                    
+                    async for line in response.aiter_lines():
+                        line = line.strip()
+                        if line:
+                            try:
+                                chunk = json.loads(line)
+                                if not got_response:
+                                    logger.info("Received first chunk from Ollama")
+                                    got_response = True
+                                logger.debug(f"Received chunk: {json.dumps(chunk)[:200]}...")
+                                yield chunk
+                            except json.JSONDecodeError as e:
+                                logger.warning(f"Failed to parse JSON: {line[:100]}... Error: {str(e)}")
+                                continue
+                    
+                    if not got_response:
+                        logger.error("No response received from Ollama")
+                        yield {
+                            "error": {"message": "No response received from provider", "code": 500}
+                        }
+                                
+        except Exception as e:
+            logger.error(f"Ollama streaming error: {str(e)}")
+            yield {
+                "error": {"message": f"Streaming failed: {str(e)}"}
+            }
     
     async def chat_completion(self, model: str, messages: List[Dict[str, Any]], 
                             temperature: float = 0.7, max_tokens: Optional[int] = None,
@@ -191,66 +269,6 @@ class OllamaClient(BaseClient):
                 "error": {"message": f"Request failed: {str(e)}"}
             }
     
-    async def stream_chat_completion(self, model: str, messages: List[Dict[str, Any]],
-                                   temperature: float = 0.7, max_tokens: Optional[int] = None) -> AsyncGenerator[Dict[str, Any], None]:
-        """Stream a chat completion from Ollama."""
-        request_data = {
-            "model": model,
-            "messages": messages,
-            "temperature": temperature,
-            "stream": True
-        }
-        
-        if max_tokens:
-            request_data["max_tokens"] = max_tokens
-        
-        try:
-            async with httpx.AsyncClient(timeout=180.0) as client:
-                async with client.stream(
-                    "POST",
-                    f"{self.endpoint}/api/chat",
-                    json=request_data
-                ) as response:
-                    
-                    if response.status_code != 200:
-                        yield {
-                            "error": {"message": f"Ollama returned status: {response.status_code}", "code": response.status_code}
-                        }
-                        return
-                    
-                    async for line in response.aiter_lines():
-                        if line.strip():
-                            try:
-                                chunk = json.loads(line)
-                                yield chunk
-                            except json.JSONDecodeError:
-                                continue
-                                
-        except Exception as e:
-            logger.error(f"Ollama streaming error: {str(e)}")
-            yield {
-                "error": {"message": f"Streaming failed: {str(e)}"}
-            }
-    
-    def get_model_by_id(self, model_id: str) -> Optional[Dict[str, Any]]:
-        """Get model details by ID."""
-        for model in self.available_models:
-            if model["id"] == model_id:
-                return model
-        return None
-    
-    def search_models(self, query: str) -> List[Dict[str, Any]]:
-        """Search models by name."""
-        query_lower = query.lower()
-        matching_models = []
-        
-        for model in self.available_models:
-            if (query_lower in model["id"].lower() or 
-                query_lower in model.get("name", "").lower()):
-                matching_models.append(model)
-        
-        return matching_models
-    
     def get_available_models(self) -> List[Dict[str, Any]]:
         """Get list of available models in OpenAI format."""
         models_list = []
@@ -265,4 +283,3 @@ class OllamaClient(BaseClient):
             })
         
         return models_list
-

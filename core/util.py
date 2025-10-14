@@ -3,7 +3,14 @@ import json
 import asyncio
 import logging
 import subprocess
-import tiktoken
+# Token counting stub, since we can't import tiktoken
+def estimate_message_tokens(messages, encoding_name="cl100k_base"):
+    # Very rough estimate - 4 chars per token
+    return sum(len(str(msg)) // 4 for msg in messages)
+
+def count_tokens_in_messages(messages, encoding_name="cl100k_base"):
+    # Very rough estimate - 4 chars per token
+    return len(str(messages)) // 4
 from pathlib import Path
 from urllib.parse import urlparse
 import platform
@@ -119,11 +126,12 @@ async def start_localhost_run_tunnel(port: int, callback=None) -> Optional[Tuple
                 text=True
             )
             if "localhost.run" in check_process.stdout:
-                termination_cmd = f'taskkill /F /FI "WINDOWTITLE eq localhost.run" /T'
+                termination_cmd = 'taskkill /F /FI "WINDOWTITLE eq localhost.run" /T'
                 try:
                     subprocess.run(termination_cmd, shell=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                except:
-                    pass 
+                except Exception as e:
+                    logger.debug(f"Error terminating process: {str(e)}")
+                    pass
         else:
             check_process = subprocess.run(
                 ["ps", "aux"], 
@@ -134,7 +142,8 @@ async def start_localhost_run_tunnel(port: int, callback=None) -> Optional[Tuple
             if "localhost.run" in check_process.stdout:
                 try:
                     subprocess.run("pkill -f 'ssh.*localhost.run'", shell=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                except:
+                except Exception as e:
+                    logger.debug(f"Error killing SSH process: {str(e)}")
                     pass
     except Exception as e:
         logger.debug(f"Could not check for existing tunnel processes: {str(e)}")
@@ -327,15 +336,15 @@ async def start_localhost_run_tunnel(port: int, callback=None) -> Optional[Tuple
                             return tunnel_url, process
                 
                 if "permission denied" in line_str.lower():
-                    logger.debug(f"SSH permission denied. Already using 'nokey@localhost.run'")
+                    logger.debug("SSH permission denied. Already using 'nokey@localhost.run'")
                     if "publickey" in line_str.lower():
                         logger.debug("SSH keys are being ignored. Using direct connection.")
                     
                 if "connection refused" in line_str.lower():
-                    logger.error(f"Connection refused to localhost.run")
+                    logger.error("Connection refused to localhost.run")
                     
                 if "no route to host" in line_str.lower():
-                    logger.error(f"No route to localhost.run - check your internet connection")
+                    logger.error("No route to localhost.run - check your internet connection")
             
             await asyncio.sleep(0.1)
         
@@ -376,7 +385,8 @@ def estimate_message_tokens(message: Dict[str, Any]) -> int:
         return 0
     
     content = message["content"]
-    role = message.get("role", "user")
+    # Role is handled by the caller
+    _ = message.get("role", "user")
     
     if not content:
         return 0

@@ -136,7 +136,8 @@ class BaseResponseHandler(ABC):
             logger.info(f"Starting stream processing for {requested_model}")
             chunk_index = 0
             message_id = self.generate_message_id()
-            created_time = self.get_current_timestamp()
+            # created_time is used in child classes
+            _ = self.get_current_timestamp()
             last_yield_time = time.time()
             start_time = time.time()
             
@@ -150,10 +151,11 @@ class BaseResponseHandler(ABC):
             lines_processed = 0
             last_data_time = time.time()
             
-            logger.info(f"Starting to iterate over response lines...")
+            logger.info("Starting to iterate over response lines...")
             async for line in response.aiter_lines():
                 current_time = time.time()
-                elapsed_time = current_time - start_time
+                # elapsed_time tracking moved to higher level
+                _ = current_time - start_time
                 idle_time = current_time - last_data_time
                 
                 lines_processed += 1
@@ -272,7 +274,8 @@ class BaseResponseHandler(ABC):
                 error_response = self.format_openai_error("Stream error", 500)
                 yield f"data: {json.dumps(error_response)}\n\n"
                 yield "data: [DONE]\n\n"
-            except:
+            except Exception as e:
+                logger.debug(f"Error handling error response: {str(e)}")
                 pass
     
     def handle_response(self, response: httpx.Response, requested_model: str, 

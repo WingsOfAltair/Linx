@@ -1,6 +1,6 @@
 {
     "openai": {
-        "api_key": "sk-cra"
+        "api_key": "v1-boomsauce"
     },
     "openrouter": {
         "api_key": "sk-or-v1-...",
@@ -25,15 +25,14 @@
         "enabled": true,
         "endpoint": "http://localhost:11434",
         "model_mappings": {
-            "default": "Qwen2.5-Coder:latest",
-            "qwen3": "Qwen3",
-            "qwen2.5": "Qwen2.5",
-            "qwen2.5-coder": "Qwen2.5-coder",
-            "qwen2.5-r1": "cyberuser42/DeepSeek-R1-Distill-Qwen-7B"
+            "default": "qwen3-coder:latest",
+            "qwen3": "qwen3:latest",
+            "qwen3-coder": "qwen3-coder:latest",
+            "qwen3-coder-480b": "qwen3-coder:480b-cloud"
         },
         "thinking_mode": true,
         "skip_integrity_check": true,
-        "max_streaming_tokens": 32000
+        "max_streaming_tokens": 96000
     },
     "routing": {
         "provider_priority": ["openrouter", "ollama", "llamacpp"],
@@ -48,6 +47,14 @@
     },
     "tunnel": {
         "use_tunnel": true,
-        "type": "localhost_run"
+        "type": "localhost_run",
+        "providers": {
+            "localhost_run": {},
+            "ngrok": {
+                "authtoken": "",
+                "region": "us",
+                "edge": "edg"
+            }
+        }
     }
 }

@@ -1,5 +1,7 @@
 import logging
 import json
+import uuid
+import time
 from typing import Dict, Any
 import httpx
 from .base_request_handler import BaseRequestHandler
@@ -62,7 +64,8 @@ class OllamaRequestHandler(BaseRequestHandler):
                     return {"error": {"message": f"Model '{model}' not available", "code": 404}}
                 else:
                     return {"error": {"message": error_data["error"], "code": response.status_code}}
-        except:
+        except Exception as e:
+            logger.debug(f"Error processing error data: {str(e)}")
             pass
         
         return {"error": {"message": error_msg, "code": response.status_code}}
@@ -74,25 +77,77 @@ class OllamaResponseHandler(BaseResponseHandler):
     def parse_provider_response(self, response: httpx.Response) -> Dict[str, Any]:
         """Parse Ollama response format."""
         try:
-            return response.json()
+            data = response.json()
+            # Convert to OpenAI format
+            if isinstance(data, dict) and "message" in data:
+                return {
+                    "id": f"chatcmpl-{str(uuid.uuid4())[:8]}",
+                    "object": "chat.completion",
+                    "created": int(time.time()),
+                    "choices": [{
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": data["message"].get("content", "")
+                        },
+                        "finish_reason": "stop" if data.get("done") else None
+                    }],
+                    "usage": {
+                        "prompt_tokens": data.get("prompt_eval_count", 0),
+                        "completion_tokens": data.get("eval_count", 0),
+                        "total_tokens": data.get("prompt_eval_count", 0) + data.get("eval_count", 0)
+                    }
+                }
+            return data
         except json.JSONDecodeError:
             try:
                 content = response.text.strip()
                 if "\n" in content:
                     # Handle multi-line JSON (take first valid line)
                     first_json = content.split("\n")[0].strip()
-                    return json.loads(first_json)
+                    data = json.loads(first_json)
                 else:
-                    return json.loads(content)
+                    data = json.loads(content)
+                    
+                if isinstance(data, dict) and "message" in data:
+                    return {
+                        "id": f"chatcmpl-{str(uuid.uuid4())[:8]}",
+                        "object": "chat.completion",
+                        "created": int(time.time()),
+                        "choices": [{
+                            "index": 0,
+                            "message": {
+                                "role": "assistant",
+                                "content": data["message"].get("content", "")
+                            },
+                            "finish_reason": "stop" if data.get("done") else None
+                        }],
+                        "usage": {
+                            "prompt_tokens": data.get("prompt_eval_count", 0),
+                            "completion_tokens": data.get("eval_count", 0),
+                            "total_tokens": data.get("prompt_eval_count", 0) + data.get("eval_count", 0)
+                        }
+                    }
+                return data
             except Exception as e:
                 logger.error(f"Failed to parse Ollama response: {str(e)}")
                 return {
-                    "message": {
-                        "role": "assistant", 
-                        "content": "I couldn't process your request. Please try again."
-                    },
-                    "prompt_eval_count": 0,
-                    "eval_count": 0
+                    "id": f"chatcmpl-{str(uuid.uuid4())[:8]}",
+                    "object": "chat.completion",
+                    "created": int(time.time()),
+                    "choices": [{
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": "I couldn't process your request. Please try again."
+                        },
+                        "finish_reason": "stop"
+                    }],
+                    "usage": {
+                        "prompt_tokens": 0,
+                        "completion_tokens": 0,
+                        "total_tokens": 0
+                    }
                 }
     
     def extract_content_from_response(self, response: Dict[str, Any]) -> str:
@@ -110,6 +165,10 @@ class OllamaResponseHandler(BaseResponseHandler):
     
     def parse_streaming_chunk(self, chunk_data: Dict[str, Any]) -> Dict[str, Any]:
         """Parse Ollama streaming chunk."""
+        # Handle keep-alive messages by returning empty content
+        if chunk_data.get("keep_alive", False):
+            return {"content": ""}
+        
         parsed = {"content": ""}
         
         if "message" in chunk_data and "content" in chunk_data["message"]:
@@ -119,4 +178,7 @@ class OllamaResponseHandler(BaseResponseHandler):
     
     def is_streaming_done(self, chunk_data: Dict[str, Any]) -> bool:
         """Check if Ollama streaming is complete."""
+        # Ignore keep-alive messages when checking completion
+        if chunk_data.get("keep_alive", False):
+            return False
         return chunk_data.get("done", False)
