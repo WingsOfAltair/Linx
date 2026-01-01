@@ -35,7 +35,9 @@ ollama serve
 ### 2. Install Dependencies
 
 ```sh
-pip install -r requirements.txt
+pip install uv
+
+uv sync 
 ```
 
 ### 3. Configure Linx
